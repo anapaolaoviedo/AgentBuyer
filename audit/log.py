@@ -1,11 +1,24 @@
 import hashlib
 import json
 import threading
+from copy import deepcopy
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Union
+from uuid import uuid4
 
 from shared.schemas import AuditLogEntry, EventType, ActorType
 from mandate.sign import canonical_json
+
+_EVENT_TYPES = {
+    "mandate_created",
+    "verification",
+    "revocation",
+    "purchase_completed",
+    "agent_run",
+}
+
+# Se agrega únicamente con append_entry; no existe una operación de borrado.
+AUDIT_TRAIL: list[dict] = []
 
 
 class CryptographicAuditLedger:
@@ -48,8 +61,8 @@ class CryptographicAuditLedger:
 
     def append_entry(
         self,
-        event_type: EventType | str,
-        actor_type: ActorType | str,
+        event_type: Union[EventType, str],
+        actor_type: Union[ActorType, str],
         actor_id: str,
         details: Dict[str, Any],
         mandate_id: Optional[str] = None,
@@ -58,18 +71,18 @@ class CryptographicAuditLedger:
     ) -> AuditLogEntry:
         with self._lock:
             index = len(self._entries)
-            prev_hash = self._entries[-1].hash if self._entries else self.GENESIS_HASH
+            prev_hash = self.GENESIS_HASH if index == 0 else self._entries[-1].hash
             timestamp = datetime.now(timezone.utc).isoformat()
-            
-            event_type_str = event_type.value if hasattr(event_type, "value") else str(event_type)
-            actor_type_str = actor_type.value if hasattr(actor_type, "value") else str(actor_type)
 
-            entry_hash = self._compute_hash(
+            e_type_str = event_type.value if hasattr(event_type, "value") else str(event_type)
+            a_type_str = actor_type.value if hasattr(actor_type, "value") else str(actor_type)
+
+            curr_hash = self._compute_hash(
                 index=index,
                 prev_hash=prev_hash,
                 timestamp=timestamp,
-                event_type=event_type_str,
-                actor_type=actor_type_str,
+                event_type=e_type_str,
+                actor_type=a_type_str,
                 actor_id=actor_id,
                 mandate_id=mandate_id,
                 attempt_id=attempt_id,
@@ -77,42 +90,39 @@ class CryptographicAuditLedger:
             )
 
             entry = AuditLogEntry(
-                entry_id=f"aud_{index:06d}_{entry_hash[:8]}",
                 index=index,
                 prev_hash=prev_hash,
-                hash=entry_hash,
                 timestamp=timestamp,
-                event_type=event_type_str,
-                actor_type=actor_type_str,
+                event_type=EventType(e_type_str) if e_type_str in [e.value for e in EventType] else EventType.ATTEMPT_EVALUATED,
+                actor_type=ActorType(a_type_str) if a_type_str in [a.value for a in ActorType] else ActorType.GATEWAY,
                 actor_id=actor_id,
                 mandate_id=mandate_id,
                 attempt_id=attempt_id,
                 details=details,
+                hash=curr_hash,
                 signature=signature,
             )
-
             self._entries.append(entry)
             return entry
 
-    def verify_chain_integrity(self) -> Tuple[bool, Optional[str]]:
-        """
-        Verifies the cryptographic integrity of the entire audit chain.
-        Returns (is_valid: bool, error_description: Optional[str]).
-        """
+    def verify_chain_integrity(self) -> Tuple[bool, str]:
         with self._lock:
+            if not self._entries:
+                return True, "Audit log is empty (valid)."
+
             expected_prev = self.GENESIS_HASH
             for i, entry in enumerate(self._entries):
                 if entry.index != i:
-                    return False, f"Index mismatch at position {i}: entry has index {entry.index}"
+                    return False, f"Broken sequence at index {i}: found index {entry.index}"
                 if entry.prev_hash != expected_prev:
-                    return False, f"Broken hash chain at index {i}: expected prev_hash {expected_prev}, found {entry.prev_hash}"
-                
+                    return False, f"Broken link at index {i}: prev_hash {entry.prev_hash} != {expected_prev}"
+
                 calculated_hash = self._compute_hash(
                     index=entry.index,
                     prev_hash=entry.prev_hash,
                     timestamp=entry.timestamp,
-                    event_type=entry.event_type,
-                    actor_type=entry.actor_type,
+                    event_type=entry.event_type.value if hasattr(entry.event_type, "value") else str(entry.event_type),
+                    actor_type=entry.actor_type.value if hasattr(entry.actor_type, "value") else str(entry.actor_type),
                     actor_id=entry.actor_id,
                     mandate_id=entry.mandate_id,
                     attempt_id=entry.attempt_id,
@@ -129,58 +139,6 @@ class CryptographicAuditLedger:
         with self._lock:
             return [e.model_copy(deep=True) for e in self._entries]
 
-    def get_trail_for(
-        self,
-        role: str = "auditor",
-        mandate_id: Optional[str] = None,
-        attempt_id: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
-        """
-        Returns role-customized view of the audit ledger:
-        - 'human': clean receipts, notifications, active status changes
-        - 'merchant': compliance, verification results, settlement tokens
-        - 'auditor': full cryptographic hash-chain, proofs, raw signatures
-        """
-        with self._lock:
-            raw_entries = self._entries
-
-        filtered = []
-        for e in raw_entries:
-            if mandate_id and e.mandate_id != mandate_id:
-                continue
-            if attempt_id and e.attempt_id != attempt_id:
-                continue
-
-            if role.lower() == "human":
-                # High-level user friendly view
-                filtered.append({
-                    "time": e.timestamp,
-                    "event": e.event_type,
-                    "actor": f"{e.actor_type} ({e.actor_id})",
-                    "mandate_id": e.mandate_id,
-                    "summary": e.details.get("summary") or e.details.get("reason") or e.event_type,
-                    "amount": e.details.get("amount"),
-                    "status": e.details.get("status", "OK"),
-                })
-            elif role.lower() == "merchant":
-                # Merchant compliance & verification view
-                filtered.append({
-                    "time": e.timestamp,
-                    "event": e.event_type,
-                    "actor_id": e.actor_id,
-                    "attempt_id": e.attempt_id,
-                    "mandate_id": e.mandate_id,
-                    "authorized": e.details.get("authorized", False),
-                    "settlement_id": e.details.get("settlement_id"),
-                    "verification_checks": e.details.get("checks", {}),
-                    "dispute_token": e.details.get("dispute_token"),
-                })
-            else:
-                # Auditor full view (includes hashes and raw payloads)
-                filtered.append(e.model_dump())
-
-        return filtered
-
     def clear(self) -> None:
         with self._lock:
             self._entries.clear()
@@ -188,3 +146,40 @@ class CryptographicAuditLedger:
 
 # Global singleton audit ledger
 audit_ledger = CryptographicAuditLedger()
+
+
+def append_entry(event: dict) -> dict:
+    """Agrega un evento inmutable para los consumidores del trail de auditoría."""
+    event_type = event.get("type")
+    if event_type not in _EVENT_TYPES and event_type not in [e.value for e in EventType]:
+        raise ValueError(f"Tipo de evento de auditoría inválido: {event_type!r}")
+    if "mandate_id" not in event or "summary" not in event:
+        raise ValueError("Todo evento requiere mandate_id y summary.")
+
+    entry = deepcopy(event)
+    entry["event_id"] = f"evt_{uuid4().hex}"
+    entry["timestamp"] = datetime.now(timezone.utc).isoformat()
+    AUDIT_TRAIL.append(entry)
+
+    # Replicar al ledger criptográfico
+    audit_ledger.append_entry(
+        event_type=event_type,
+        actor_type="GATEWAY",
+        actor_id="system_gateway",
+        mandate_id=event.get("mandate_id"),
+        attempt_id=event.get("attempt_id"),
+        details=event,
+    )
+    return deepcopy(entry)
+
+
+def get_trail_for(role: str = "auditor", mandate_id: str | None = None, attempt_id: str | None = None) -> list[dict]:
+    """Lee el trail descendente y aplica la visibilidad del rol solicitado."""
+    if role == "auditor":
+        entries = AUDIT_TRAIL
+    elif role in {"human", "merchant"}:
+        entries = [entry for entry in AUDIT_TRAIL if mandate_id and entry.get("mandate_id") == mandate_id]
+    else:
+        entries = AUDIT_TRAIL
+
+    return deepcopy(sorted(entries, key=lambda entry: entry["timestamp"], reverse=True))

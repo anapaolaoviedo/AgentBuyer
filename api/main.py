@@ -1,37 +1,42 @@
+import os
+import time
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
+
 from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 
 from shared.schemas import (
     Mandate,
-    CatalogItem,
+    CreateMandateRequest,
+    RevokeMandateRequest,
     PurchaseAttempt,
-    VerificationResult,
+    ExecutePurchaseRequest,
     HITLApprovalRequest,
-    AuditLogEntry,
+    ResolveEscalationRequest,
     DisputeClaim,
-    MandateStatus,
+    FileDisputeRequest,
+    CatalogItem,
 )
-from mandate.sign import generate_keypair
 from mandate.issue import create_mandate
+from mandate.sign import generate_keypair
 from core.mandate_store import (
     mandate_store,
     create_mandate as store_create_mandate,
     get_mandate as store_get_mandate,
     revoke_mandate as store_revoke_mandate,
 )
-from core.agent_loop import PurchasingAgent, run_agent
 from core.merchant import vuelaya_merchant, get_flights
-from core.verify import get_pending_escalations, resolve_escalation, verify_purchase
+from core.agent_loop import PurchasingAgent, run_agent
+from audit.log import audit_ledger, append_entry, get_trail_for
 from core.dispute import dispute_arbiter
-from audit.log import audit_ledger
 from mandate.adversarial_tests import run_adversarial_suite
-from core.seed_loader import load_seed_mandates
 
 app = FastAPI(
     title="AgentBuyer Protocol API",
-    description="Cryptographic Mandate & Safe Autonomous Agent Purchasing Circuit",
+    description="Safe agentic purchases powered by Zero-Trust mandates, cryptographic signatures & deterministic limits.",
     version="1.0.0",
 )
 
@@ -43,56 +48,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.on_event("startup")
-def load_initial_mandates():
-    """Crea estado vivo fresco para cada mandato definido en el archivo semilla."""
-    try:
-        load_seed_mandates()
-    except Exception:
-        pass
-
-
-# Request schemas
-class CreateMandateRequest(BaseModel):
-    human_id: str = "marta_traveler"
-    max_amount_per_tx: float = 150.0
-    monthly_budget: float = 500.0
-    allowed_categories: List[str] = ["travel", "flights"]
-    allowed_merchants: List[str] = ["*"]
-    conditions_expression: Optional[str] = "price <= 150 AND destination == 'COR'"
-    currency: str = "USD"
-    max_executions_per_month: int = 5
-    allow_hitl_escalation: bool = True
-    validity_days: int = 30
-    masked_card: str = "•••• 4242"
-    bank_issuer: str = "Galicia AI Payments"
-
-
-class RevokeMandateRequest(BaseModel):
-    reason: str = "Revoked by cardholder (Trial by Fire)"
-
-
-class ResolveEscalationRequest(BaseModel):
-    approved: bool
-    note: str = ""
-
-
-class ExecutePurchaseRequest(BaseModel):
-    mandate_id: str
-    item_id: str
-    agent_id: str = "agent_marta"
-    override_amount: Optional[float] = None
-
-
-class FileDisputeRequest(BaseModel):
-    attempt_id: str
-    mandate_id: str
-    claimant_id: str = "marta_traveler"
-    reason: str = "Cardholder disputes transaction"
-
-
-# Internal test keypairs cache
+# Key storage for demo
 _key_registry: Dict[str, Dict[str, str]] = {}
 
 
@@ -102,9 +58,6 @@ def _get_or_create_keys(entity_id: str) -> Dict[str, str]:
         _key_registry[entity_id] = {"priv": priv, "pub": pub}
     return _key_registry[entity_id]
 
-
-from fastapi.responses import HTMLResponse
-import os
 
 @app.get("/")
 def root():
@@ -135,15 +88,18 @@ def health():
 class OtpSendReq(BaseModel):
     phone: str
 
+
 class OtpVerifyReq(BaseModel):
     phone: str
     code: str
 
+
 _otp_store: Dict[str, str] = {}
+
 
 @app.post("/api/otp/send")
 def api_otp_send(req: OtpSendReq):
-    code = "849201" # Default test code or generated 6-digit code
+    code = "849201"
     _otp_store[req.phone] = code
     return {
         "success": True,
@@ -151,6 +107,7 @@ def api_otp_send(req: OtpSendReq):
         "phone": req.phone,
         "requestId": f"req_{int(time.time())}"
     }
+
 
 @app.post("/api/otp/verify")
 def api_otp_verify(req: OtpVerifyReq):
@@ -204,7 +161,15 @@ def create_mandate_endpoint(mandate: dict[str, Any]):
         )
 
     try:
-        return store_create_mandate(mandate)
+        record = store_create_mandate(mandate)
+        append_entry(
+            {
+                "type": "mandate_created",
+                "mandate_id": mandate_id,
+                "summary": f"Mandato creado para {mandate.get('human', {}).get('display_name', 'la persona autorizante')}.",
+            }
+        )
+        return record
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=str(error)
@@ -220,7 +185,6 @@ def api_list_mandates(human_id: Optional[str] = None):
 def api_get_mandate(mandate_id: str):
     mandate = mandate_store.get_mandate(mandate_id)
     if not mandate:
-        # Check dictionary store
         rec = store_get_mandate(mandate_id)
         if rec:
             return rec
@@ -231,11 +195,21 @@ def api_get_mandate(mandate_id: str):
 @app.post("/mandates/{mandate_id}/revoke")
 def api_revoke_mandate(mandate_id: str, req: Optional[RevokeMandateRequest] = None):
     reason = req.reason if req else "Revocado por el usuario"
+    previous = store_get_mandate(mandate_id)
     success = mandate_store.revoke_mandate(mandate_id, reason)
-    store_revoke_mandate(mandate_id)
-    if not success:
+    record = store_revoke_mandate(mandate_id)
+    
+    if previous is not None and previous.get("live_state", {}).get("status") != "revoked":
+        append_entry(
+            {
+                "type": "revocation",
+                "mandate_id": mandate_id,
+                "summary": "Mandato revocado por la persona autorizante.",
+            }
+        )
+    if not success and record is None:
         raise HTTPException(status_code=404, detail="Mandate not found")
-    return {"status": "REVOKED", "mandate_id": mandate_id, "reason": reason}
+    return record or {"status": "REVOKED", "mandate_id": mandate_id, "reason": reason}
 
 
 @app.post("/mandates/{mandate_id}/pause")
@@ -299,35 +273,14 @@ def api_execute_purchase(req: ExecutePurchaseRequest):
     }
 
 
-# Human-In-The-Loop Escalation Endpoints
-@app.get("/escalations/pending", response_model=List[HITLApprovalRequest])
-def api_get_pending_escalations(mandate_id: Optional[str] = None):
-    return get_pending_escalations(mandate_id)
-
-
-@app.post("/escalations/{escalation_id}/resolve")
-def api_resolve_escalation(escalation_id: str, req: ResolveEscalationRequest):
-    h_keys = _get_or_create_keys("marta_traveler")
-    res = resolve_escalation(
-        escalation_id=escalation_id,
-        approved=req.approved,
-        human_privkey=h_keys["priv"],
-        human_pubkey=h_keys["pub"],
-        note=req.note,
-    )
-    if not res:
-        raise HTTPException(status_code=404, detail="Escalation request not found or already resolved")
-    return res
-
-
-# Audit Ledger Endpoints
+# Audit Trail Router
 @app.get("/audit/trail")
 def api_get_audit_trail(
     role: str = Query(default="auditor", pattern="^(human|merchant|auditor)$"),
     mandate_id: Optional[str] = None,
     attempt_id: Optional[str] = None,
 ):
-    return audit_ledger.get_trail_for(role=role, mandate_id=mandate_id, attempt_id=attempt_id)
+    return get_trail_for(role=role, mandate_id=mandate_id, attempt_id=attempt_id)
 
 
 @app.get("/audit/verify")
@@ -362,21 +315,17 @@ def api_run_adversarial():
     }
 
 
-# Include modular routers if present
+# Include modular routers
+from api.agent import router as agent_router
+from api.audit import router as audit_router
+from api.merchant import router as merchant_router
+
+app.include_router(agent_router)
+app.include_router(audit_router)
+app.include_router(merchant_router)
+
 try:
     from api.verify import router as verify_router
     app.include_router(verify_router)
-except ImportError:
-    pass
-
-try:
-    from api.agent import router as agent_router
-    app.include_router(agent_router)
-except ImportError:
-    pass
-
-try:
-    from api.merchant import router as merchant_router
-    app.include_router(merchant_router)
 except ImportError:
     pass

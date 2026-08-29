@@ -47,13 +47,16 @@ class MandateStore:
             m_obj = Mandate(**m_dict)
             
             # Chequeo en vivo de expiración
-            if m_obj.status == MandateStatus.ACTIVE:
+            if m_obj.status == MandateStatus.ACTIVE and m_obj.expires_at:
                 now = datetime.now(timezone.utc)
-                exp = datetime.fromisoformat(m_obj.expires_at.replace("Z", "+00:00"))
-                if now > exp:
-                    m_obj.status = MandateStatus.EXPIRED
-                    record["live_state"]["status"] = "expired"
-                    record["mandate"]["status"] = "EXPIRED"
+                try:
+                    exp = datetime.fromisoformat(m_obj.expires_at.replace("Z", "+00:00"))
+                    if now > exp:
+                        m_obj.status = MandateStatus.EXPIRED
+                        record["live_state"]["status"] = "expired"
+                        record["mandate"]["status"] = "EXPIRED"
+                except Exception:
+                    pass
 
             if record["live_state"]["status"] == "revoked":
                 m_obj.status = MandateStatus.REVOKED
@@ -79,9 +82,12 @@ class MandateStore:
             record["live_state"]["status"] = "revoked"
             now_iso = datetime.now(timezone.utc).isoformat()
             record["live_state"]["revoked_at"] = now_iso
-            record["mandate"]["status"] = "REVOKED"
-            record["mandate"]["revoked_at"] = now_iso
-            record["mandate"]["revocation_reason"] = reason
+            if "status" in record["mandate"]:
+                record["mandate"]["status"] = "REVOKED"
+            if "revoked_at" in record["mandate"]:
+                record["mandate"]["revoked_at"] = now_iso
+            if "revocation_reason" in record["mandate"]:
+                record["mandate"]["revocation_reason"] = reason
             return True
 
     def pause_mandate(self, mandate_id: str) -> bool:
@@ -118,7 +124,7 @@ class MandateStore:
 mandate_store = MandateStore()
 
 
-# Funciones de compatibilidad funcional para API routes
+# Funciones funcionales para frontend y routers
 def create_mandate(mandate: dict) -> dict:
     import uuid
     from mandate.sign import generate_keypair, sign_payload

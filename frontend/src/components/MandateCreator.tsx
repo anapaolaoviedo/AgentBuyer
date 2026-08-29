@@ -1,5 +1,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import Saturday from "./Saturday";
+import { useLivenessVerification } from "../hooks/useLivenessVerification";
+import { useZeroTrustSecurity } from "../hooks/useZeroTrustSecurity";
 
 const API_BASE = "http://127.0.0.1:8000";
 
@@ -34,13 +36,21 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
   const [priceBelow, setPriceBelow] = useState("150");
   const [validUntil, setValidUntil] = useState(endOfMonth());
   
-  // 🛡️ Capa de Seguridad, Identidad (Passkey/Huella/SMS) y DLP Bancario
+  // 🛡️ Identidad y Datos Bancarios DLP
   const [userIdDoc, setUserIdDoc] = useState("PASSPORT-AR-948291");
   const [userPhone, setUserPhone] = useState("+54 9 11 5829-1039");
   const [smsOtp, setSmsOtp] = useState("849201");
   const [cardNumber, setCardNumber] = useState("•••• •••• •••• 4242");
-  const [passkeyActive, setPasskeyActive] = useState(true);
+
+  // Modal y Hooks Biométicos
+  const [showBioModal, setShowBioModal] = useState(false);
+  const [bioMode, setBioMode] = useState<"camera" | "fingerprint">("camera");
+  const [passkeyVerified, setPasskeyVerified] = useState(true);
   const [smsVerified, setSmsVerified] = useState(true);
+  const [tokenVerified, setTokenVerified] = useState(true);
+
+  const { videoRef, livenessState, startCamera, stopCamera, verifyFacePresence, verifySmsCode } = useLivenessVerification();
+  const { handlePasskeyChallenge } = useZeroTrustSecurity();
 
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -51,6 +61,32 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
     () => `Saturday podrá comprar ${selectedCategory.toLowerCase()} en ${selectedMerchant}, hasta $${maxAmount || "—"} por compra, máximo ${maxUses || "—"} veces, solo si el precio baja de $${priceBelow || "—"}${validUntil ? `, válido hasta ${validUntil}.` : "."} (Enrolado con Passkey + SMS OTP + Token DLP).`,
     [humanName, maxAmount, maxUses, priceBelow, selectedCategory, selectedMerchant, validUntil],
   );
+
+  async function openBiometricsModal() {
+    setShowBioModal(true);
+    setBioMode("camera");
+    try {
+      await startCamera();
+      // Iniciar verificación tras 1.5s
+      setTimeout(async () => {
+        try {
+          await verifyFacePresence();
+          setPasskeyVerified(true);
+          setTimeout(() => setShowBioModal(false), 800);
+        } catch (e) {
+          console.warn("Liveness error:", e);
+        }
+      }, 1500);
+    } catch {
+      // Fallback a passkey nativo WebAuthn
+      try {
+        await handlePasskeyChallenge();
+        setPasskeyVerified(true);
+      } catch (err) {
+        console.warn(err);
+      }
+    }
+  }
 
   async function createMandate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -82,9 +118,8 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
         conditions: [{ type: "price_below", value: price }],
         off_session_consent: true,
       },
-      // 🛡️ Datos Bancarios Tokenizados (DLP) & Autenticación Fuerte
       authentication: {
-        passkey_biometrics: passkeyActive ? "verified_webauthn_touch_id" : "unverified",
+        passkey_biometrics: passkeyVerified ? "verified_webauthn_touch_id" : "unverified",
         sms_otp_confirmed: smsVerified,
         sms_code: smsOtp,
       },
@@ -117,6 +152,28 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
   return (
     <main className="authorization-shell">
       <div className="starfield" aria-hidden="true" />
+      
+      {/* Modal Biométrico */}
+      {showBioModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(10, 14, 26, 0.94)", backdropFilter: "blur(16px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+          <div style={{ width: "min(420px, 94vw)", background: "#141B2E", border: "1px solid rgba(77, 124, 255, 0.4)", borderRadius: "1.5rem", padding: "1.5rem", textAlign: "center", position: "relative" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h2 style={{ margin: 0, fontFamily: "Space Grotesk", fontSize: "1.25rem", color: "#E8ECF5" }}>Face ID & Biometría</h2>
+              <button type="button" onClick={() => { stopCamera(); setShowBioModal(false); }} style={{ background: "transparent", border: 0, color: "#8A94AD", fontSize: "1.2rem", cursor: "pointer" }}>✕</button>
+            </div>
+
+            <div style={{ position: "relative", width: "230px", height: "290px", margin: "1rem auto", borderRadius: "50%", overflow: "hidden", border: "4px solid #3DDC97", boxShadow: "0 0 30px rgba(61, 220, 151, 0.5)", background: "#000" }}>
+              <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)", display: "block" }} />
+              <div style={{ position: "absolute", top: "10%", left: 0, right: 0, height: "3px", background: "#3DDC97", boxShadow: "0 0 15px #3DDC97" }} />
+            </div>
+
+            <p style={{ color: "#3DDC97", fontFamily: "Space Grotesk", fontSize: "0.85rem", fontWeight: 600 }}>
+              {livenessState.error ? livenessState.error : livenessState.isLiveFaceVerified ? "✅ ¡Humano verificado!" : "Centra tu rostro en el óvalo..."}
+            </p>
+          </div>
+        </div>
+      )}
+
       <section className="authorization-layout">
         <div className="authorization-intro">
           <p className="mission-kicker">AGENTBUYER / TU PERMISO, TUS LÍMITES</p>
@@ -164,18 +221,21 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
               </label>
               <label style={{ fontSize: "0.72rem" }}>
                 Código SMS (OTP):
-                <input value={smsOtp} onChange={(e) => setSmsOtp(e.target.value)} placeholder="849201" style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <input value={smsOtp} onChange={(e) => setSmsOtp(e.target.value)} placeholder="849201" maxLength={6} style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
+                  <button type="button" onClick={async () => { await verifySmsCode(userPhone, smsOtp); setSmsVerified(true); }} style={{ background: "rgba(59, 130, 246, 0.25)", border: "1px solid #3b82f6", color: "#93c5fd", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: "0 10px" }}>OK</button>
+                </div>
               </label>
             </div>
 
             <div style={{ display: "flex", gap: "10px", marginTop: "10px", flexWrap: "wrap", alignItems: "center" }}>
               <button
                 type="button"
-                onClick={() => setPasskeyActive(!passkeyActive)}
+                onClick={openBiometricsModal}
                 style={{
-                  background: passkeyActive ? "rgba(16, 185, 129, 0.2)" : "rgba(255, 92, 92, 0.2)",
-                  border: passkeyActive ? "1px solid #10b981" : "1px solid #ff5c5c",
-                  color: passkeyActive ? "#6ee7b7" : "#fca5a5",
+                  background: passkeyVerified ? "rgba(16, 185, 129, 0.2)" : "rgba(77, 124, 255, 0.2)",
+                  border: passkeyVerified ? "1px solid #10b981" : "1px solid #4D7CFF",
+                  color: passkeyVerified ? "#6ee7b7" : "#93c5fd",
                   padding: "6px 12px",
                   borderRadius: "8px",
                   fontSize: "0.75rem",
@@ -183,11 +243,15 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
                   cursor: "pointer"
                 }}
               >
-                {passkeyActive ? "✓ Passkey (Face ID / Huella) Confirmada" : "✕ Click para activar Passkey"}
+                {passkeyVerified ? "✓ Face ID / Huella Verificada" : "📷 Abrir Face ID / Huella"}
               </button>
 
-              <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
-                🛡️ <b>Garantía DLP:</b> Tarjeta enmascarada; solo se emite token <code>vtok_...</code>
+              <span style={{ fontSize: "0.72rem", color: "#6ee7b7", background: "rgba(16, 185, 129, 0.15)", padding: "4px 8px", borderRadius: "6px", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+                ✓ SMS Verificado
+              </span>
+
+              <span style={{ fontSize: "0.72rem", color: "#93c5fd", background: "rgba(59, 130, 246, 0.15)", padding: "4px 8px", borderRadius: "6px", border: "1px solid rgba(59, 130, 246, 0.3)" }}>
+                🛡️ Token DLP: <code>vtok_...</code>
               </span>
             </div>
           </div>

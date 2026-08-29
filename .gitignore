@@ -9,5 +9,4 @@ __pycache__/
 .pytest_cache/
 CLAUDE.md
 pytest.ini
-demo/node_modules/
-demo/dist/
+frontend/package-lock.json

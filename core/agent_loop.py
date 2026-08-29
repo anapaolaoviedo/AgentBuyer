@@ -16,7 +16,7 @@ from shared.schemas import (
 from mandate.sign import sign_payload
 from core.merchant import vuelaya_merchant, VuelaYaMerchant, get_flights
 from core.mandate_store import VERIFICATION_EVENTS, get_mandate
-from audit.log import audit_ledger
+from audit.log import audit_ledger, append_entry
 
 
 class PurchasingAgent:
@@ -52,91 +52,61 @@ class PurchasingAgent:
             "mandate_id": mandate.mandate_id,
             "agent_id": active_agent_id,
             "merchant_id": merchant_id,
-            "item_id": item.item_id,
-            "item_title": item.title,
             "category": item.category,
             "amount": amount,
             "currency": item.currency,
-            "metadata": item.metadata,
             "timestamp": timestamp,
             "nonce": nonce,
+            "item_description": item.description,
+            "metadata": item.metadata,
         }
 
         if forge_signature:
-            signature = "deadbeef" * 8
+            signature = "forged_signature_000000000000000000000000000000000000000000000000"
         else:
             signature = sign_payload(self.agent_privkey, unsigned_dict)
 
         return PurchaseAttempt(
-            attempt_id=attempt_id,
-            mandate_id=mandate.mandate_id,
-            agent_id=active_agent_id,
-            merchant_id=merchant_id,
-            item_id=item.item_id,
-            item_title=item.title,
-            category=item.category,
-            amount=amount,
-            currency=item.currency,
-            metadata=item.metadata,
-            timestamp=timestamp,
-            nonce=nonce,
-            agent_signature=signature,
+            **unsigned_dict,
+            signature=signature,
         )
 
     def attempt_purchase(
         self,
         mandate: Mandate,
         item: CatalogItem,
-        merchant: Optional[VuelaYaMerchant] = None,
+        merchant: VuelaYaMerchant,
         override_amount: Optional[float] = None,
         tampered_nonce: Optional[str] = None,
         tampered_agent_id: Optional[str] = None,
         forge_signature: bool = False,
     ) -> Tuple[PurchaseAttempt, VerificationResult]:
-        if merchant is None:
-            merchant = vuelaya_merchant
-
         attempt = self.create_signed_attempt(
             mandate=mandate,
             item=item,
-            merchant_id=merchant.MERCHANT_ID,
+            merchant_id=merchant.merchant_id,
             override_amount=override_amount,
             tampered_nonce=tampered_nonce,
             tampered_agent_id=tampered_agent_id,
             forge_signature=forge_signature,
         )
 
-        audit_ledger.append_entry(
-            event_type=EventType.PURCHASE_ATTEMPTED,
-            actor_type=ActorType.AGENT,
-            actor_id=self.agent_id,
-            mandate_id=mandate.mandate_id,
-            attempt_id=attempt.attempt_id,
-            details={
-                "item_id": item.item_id,
-                "title": item.title,
-                "amount": attempt.amount,
-                "category": item.category,
-                "merchant": merchant.MERCHANT_ID,
-            },
-            signature=attempt.agent_signature,
-        )
+        from core.verify import gateway
+        result = gateway.verify_and_authorize(attempt, mandate, merchant_pubkey=merchant.pubkey)
 
-        verification_result = merchant.process_purchase(attempt)
+        if result.authorized:
+            merchant.record_settlement(
+                attempt_id=attempt.attempt_id,
+                settlement_token=result.settlement_token,
+                amount=attempt.amount,
+            )
 
-        record = {
-            "attempt_id": attempt.attempt_id,
-            "mandate_id": mandate.mandate_id,
-            "item_title": item.title,
-            "amount": attempt.amount,
-            "authorized": verification_result.authorized,
-            "status": verification_result.status.value,
-            "reason": verification_result.reason,
-            "timestamp": attempt.timestamp,
-        }
-        self.purchase_history.append(record)
+        self.purchase_history.append({
+            "attempt": attempt.model_dump(),
+            "result": result.model_dump(),
+        })
 
-        return attempt, verification_result
+        return attempt, result
 
 
 def _price_limit(mandate: dict) -> int | float | None:
@@ -209,6 +179,26 @@ def run_agent(mandate_id: str) -> dict:
         + f"eligió {selected_flight['id']} ({selected_flight['route']}) por {selected_flight['price']} USD. "
         + ("La compra fue completada tras recibir APPROVE." if completed else f"La compra no procedió: verify devolvió {verdict}. {verification.get('human_readable', '')}")
     )
+    
+    append_entry(
+        {
+            "type": "agent_run",
+            "mandate_id": mandate_id,
+            "attempt_id": attempt_id,
+            "verdict": verdict,
+            "summary": story,
+        }
+    )
+    if completed:
+        append_entry(
+            {
+                "type": "purchase_completed",
+                "mandate_id": mandate_id,
+                "attempt_id": attempt_id,
+                "verdict": "APPROVE",
+                "summary": f"Compra completada por Saturday: {selected_flight['route']} por {selected_flight['price']} USD.",
+            }
+        )
     return {
         "mandate_id": mandate_id,
         "attempt_id": attempt_id,
