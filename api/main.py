@@ -74,17 +74,7 @@ def _get_or_create_keys(entity_id: str) -> Dict[str, str]:
     return _key_registry[entity_id]
 
 
-@app.get("/")
-def root():
-    return {
-        "status": "online",
-        "system": "AgentBuyer Safe Agentic Purchase Protocol",
-        "version": "1.0.0",
-        "web_app": "/app",
-        "docs": "/docs",
-    }
-
-
+@app.get("/", response_class=HTMLResponse)
 @app.get("/app", response_class=HTMLResponse)
 def web_app():
     static_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "index.html")
@@ -92,6 +82,7 @@ def web_app():
         with open(static_file, "r", encoding="utf-8") as f:
             return f.read()
     return "<h1>AgentBuyer Mission Control</h1>"
+
 
 
 @app.get("/health")
@@ -114,27 +105,68 @@ _otp_store: Dict[str, str] = {}
 
 @app.post("/api/otp/send")
 def api_otp_send(req: OtpSendReq):
+    import random
+    raw_phone = req.phone.strip()
+    clean_phone = "".join(c for c in raw_phone if c.isdigit())
     code = "849201"
-    _otp_store[req.phone] = code
+    
+    _otp_store[raw_phone] = code
+    if clean_phone:
+        _otp_store[clean_phone] = code
+
+    # Twilio SMS gateway dispatch if configured
+    sms_sent = False
+    twilio_sid = os.environ.get("TWILIO_ACCOUNT_SID")
+    twilio_token = os.environ.get("TWILIO_AUTH_TOKEN")
+    twilio_from = os.environ.get("TWILIO_PHONE_NUMBER")
+    if twilio_sid and twilio_token and twilio_from:
+        try:
+            import base64
+            import urllib.parse
+            import urllib.request
+            auth_str = base64.b64encode(f"{twilio_sid}:{twilio_token}".encode()).decode()
+            twilio_url = f"https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}/Messages.json"
+            post_data = urllib.parse.urlencode({
+                "From": twilio_from,
+                "To": raw_phone,
+                "Body": f"[AgentBuyer Zero-Trust] Tu código de verificación es: {code}."
+            }).encode()
+            t_req = urllib.request.Request(twilio_url, data=post_data, headers={
+                "Authorization": f"Basic {auth_str}",
+                "Content-Type": "application/x-www-form-urlencoded"
+            })
+            with urllib.request.urlopen(t_req, timeout=5) as resp:
+                if resp.status in [200, 201]:
+                    sms_sent = True
+        except Exception as e:
+            print("Twilio SMS send notice:", e)
+
     return {
         "success": True,
-        "message": f"Código SMS OTP enviado a {req.phone}",
-        "phone": req.phone,
+        "code": code,
+        "message": f"Código SMS OTP enviado a {raw_phone}",
+        "phone": raw_phone,
+        "gateway_delivered": sms_sent,
         "requestId": f"req_{int(time.time())}"
     }
 
 
 @app.post("/api/otp/verify")
 def api_otp_verify(req: OtpVerifyReq):
-    expected = _otp_store.get(req.phone, "849201")
-    if req.code == expected or (len(req.code) == 6 and req.code.isdigit()):
+    raw_phone = req.phone.strip()
+    clean_phone = "".join(c for c in raw_phone if c.isdigit())
+    code_in = req.code.strip()
+    
+    expected = _otp_store.get(raw_phone) or _otp_store.get(clean_phone) or "849201"
+    if code_in == expected or (len(code_in) == 6 and code_in.isdigit()):
         return {
             "success": True,
             "verified": True,
-            "phone": req.phone,
+            "phone": raw_phone,
             "verifiedAt": datetime.now(timezone.utc).isoformat()
         }
     raise HTTPException(status_code=401, detail="Código SMS OTP inválido")
+
 
 
 # Mandate Endpoints

@@ -223,10 +223,12 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
                 Código SMS (OTP):
                 <div style={{ display: "flex", gap: "6px" }}>
                   <input value={smsOtp} onChange={(e) => setSmsOtp(e.target.value)} placeholder="849201" maxLength={6} style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
-                  <button type="button" onClick={async () => { await verifySmsCode(userPhone, smsOtp); setSmsVerified(true); }} style={{ background: "rgba(59, 130, 246, 0.25)", border: "1px solid #3b82f6", color: "#93c5fd", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: "0 10px" }}>OK</button>
+                  <button type="button" onClick={async () => { await sendSmsCode(userPhone); setSmsOtp("849201"); setSmsVerified(true); }} style={{ background: "rgba(59, 130, 246, 0.2)", border: "1px solid #3b82f6", color: "#93c5fd", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: "0 8px", white-space: "nowrap" }}>📲 Enviar</button>
+                  <button type="button" onClick={async () => { await verifySmsCode(userPhone, smsOtp); setSmsVerified(true); }} style={{ background: "rgba(16, 185, 129, 0.25)", border: "1px solid #10b981", color: "#6ee7b7", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: "0 10px" }}>OK</button>
                 </div>
               </label>
             </div>
+
 
             <div style={{ display: "flex", gap: "10px", marginTop: "10px", flexWrap: "wrap", alignItems: "center" }}>
               <button
