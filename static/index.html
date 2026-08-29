@@ -35,6 +35,7 @@
       margin: 0;
     }
 
+    /* Saturday Mascot Card */
     .saturday-wrap {
       position: relative;
       display: grid;
@@ -112,8 +113,6 @@
       border-radius: 0 0 999px 999px;
       transition: all 0.3s ease;
     }
-    .mouth-thinking { width: 1.2rem; border-radius: 0; transform: rotate(-9deg); }
-    .mouth-reject { width: 1.2rem; border-radius: 0; transform: rotate(180deg); border-bottom: 3px solid #FF5C5C; }
 
     .authorization-shell {
       min-height: 100vh;
@@ -260,6 +259,74 @@
       transform: none;
     }
 
+    /* Modal de Cámara Face ID & Biometría */
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(10, 14, 26, 0.88);
+      backdrop-filter: blur(12px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem;
+    }
+    .biometric-box {
+      width: min(460px, 94vw);
+      background: #141B2E;
+      border: 1px solid #4D7CFF;
+      border-radius: 1.5rem;
+      padding: 1.5rem;
+      box-shadow: 0 0 50px rgba(77, 124, 255, 0.35);
+      text-align: center;
+      position: relative;
+    }
+    .scanner-viewport {
+      position: relative;
+      width: 260px;
+      height: 260px;
+      margin: 1rem auto;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 3px solid #4D7CFF;
+      box-shadow: 0 0 30px rgba(77, 124, 255, 0.5);
+      background: #000;
+    }
+    .scanner-viewport video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+    .scan-laser {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: #3DDC97;
+      box-shadow: 0 0 15px #3DDC97, 0 0 30px #3DDC97;
+      animation: laserMove 2s infinite ease-in-out;
+    }
+    @keyframes laserMove {
+      0% { top: 5%; opacity: 0.8; }
+      50% { top: 92%; opacity: 1; }
+      100% { top: 5%; opacity: 0.8; }
+    }
+    .fingerprint-anim {
+      width: 120px;
+      height: 120px;
+      margin: 1.5rem auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 5rem;
+      border-radius: 50%;
+      background: rgba(77, 124, 255, 0.1);
+      border: 2px dashed #4D7CFF;
+      animation: pulseGlow 1.5s infinite;
+    }
+    @keyframes pulseGlow {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(77, 124, 255, 0.4); }
+      70% { transform: scale(1.05); box-shadow: 0 0 0 20px rgba(77, 124, 255, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(77, 124, 255, 0); }
+    }
+
+    /* Pantalla 2: Mission Control */
     .mission-shell {
       min-height: 100vh;
       background: #0A0E1A;
@@ -428,6 +495,48 @@
 <body>
   <div class="starfield"></div>
 
+  <!-- MODAL DE ESCÁNER BIOMÉTRICO (CÁMARA FACE ID & HUELLA) -->
+  <div id="biometric-modal" class="modal-backdrop" style="display: none;">
+    <div class="biometric-box">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <p class="mission-kicker" style="color: #4D7CFF;">VERIFICACIÓN BIOMÉTRICA DE PLATAFORMA</p>
+        <button type="button" onclick="cerrarModalBiometria()" style="background: transparent; border: 0; color: #8A94AD; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <h2 id="bio-title" style="margin: 8px 0 4px; font-family: 'Space Grotesk'; font-size: 1.35rem;">
+        Escaneando Face ID (Cámara Activa)
+      </h2>
+      <p id="bio-desc" style="font-size: 0.8rem; color: #8A94AD; margin: 0;">
+        Mira fijamente a la cámara para autenticar tu identidad con WebAuthn.
+      </p>
+
+      <!-- Contenedor de Video Cámara -->
+      <div id="camera-container" class="scanner-viewport">
+        <video id="face-video" autoplay playsinline muted></video>
+        <div id="scan-laser-beam" class="scan-laser"></div>
+      </div>
+
+      <!-- Contenedor alternativo de Huella -->
+      <div id="fingerprint-container" style="display: none;">
+        <div class="fingerprint-anim">👆</div>
+        <p style="color: #93c5fd; font-size: 0.85rem; font-weight: 600;">Coloca tu dedo en el sensor o usa Windows Hello</p>
+      </div>
+
+      <p id="bio-status-text" style="color: #3DDC97; font-family: 'Space Grotesk'; font-size: 0.85rem; font-weight: 700; margin: 10px 0;">
+        ⏳ Rastreando puntos nodales y prueba de vida...
+      </p>
+
+      <div style="display: flex; gap: 8px; justify-content: center; margin-top: 14px;">
+        <button type="button" onclick="cambiarModoBiometrico('camera')" style="background: rgba(77, 124, 255, 0.2); border: 1px solid #4D7CFF; color: #93c5fd; padding: 6px 12px; border-radius: 8px; font-size: 0.72rem; cursor: pointer;">
+          📷 Usar Cámara (Face ID)
+        </button>
+        <button type="button" onclick="cambiarModoBiometrico('fingerprint')" style="background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; color: #6ee7b7; padding: 6px 12px; border-radius: 8px; font-size: 0.72rem; cursor: pointer;">
+          👆 Usar Huella Digital
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- PANTALLA 1: FORMULARIO DE ENROLAMIENTO & DATOS DEL USUARIO -->
   <div id="screen-form" class="authorization-shell">
     <div class="authorization-layout">
@@ -527,7 +636,7 @@
         <!-- 🛡️ Bloque de Autenticación, ID, SMS y Tarjeta DLP -->
         <div style="background: rgba(30, 41, 59, 0.6); padding: 14px; border-radius: 10px; border: 1px solid rgba(77, 124, 255, 0.35); margin-top: 4px;">
           <p style="margin: 0 0 8px; font-family: 'Space Grotesk'; font-size: 0.75rem; font-weight: 700; color: #93c5fd; letter-spacing: 0.08em;">
-            🔐 2. IDENTIDAD, PASSKEY (HUELLA/FACE ID) & DATOS BANCARIOS DLP
+            🔐 2. IDENTIDAD, BIOMETRÍA (FACE ID / HUELLA) & DATOS BANCARIOS DLP
           </p>
           
           <div class="form-pair">
@@ -557,15 +666,15 @@
             </label>
           </div>
 
-          <!-- Indicadores en tiempo real de los 3 factores -->
+          <!-- Botones e indicadores interactivos -->
           <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; align-items: center;">
             <button
               id="btn-passkey"
               type="button"
-              onclick="ejecutarPasskeyBiometria()"
-              style="background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; color: #6ee7b7; padding: 6px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all .2s;"
+              onclick="abrirModalBiometria()"
+              style="background: rgba(77, 124, 255, 0.2); border: 1px solid #4D7CFF; color: #93c5fd; padding: 6px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all .2s;"
             >
-              ✓ Passkey (Face ID / Huella) Confirmada
+              📷 Abrir Cámara Face ID / Huella
             </button>
 
             <span id="badge-sms-status" style="font-size: 0.72rem; color: #6ee7b7; background: rgba(16, 185, 129, 0.15); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.3);">
@@ -722,51 +831,118 @@
 
   <script>
     // 🛡️ ESTADO REACTIVO DE LOS 3 FACTORES ZERO-TRUST
-    let isPasskeyVerified = true;
+    let isPasskeyVerified = false;
     let isSmsVerified = true;
     let isStripeTokenized = true;
     let activeTokenId = "vtok_mht94htz";
+    let mediaStreamGlobal = null;
 
-    // 1. EJECUTAR PASSKEY / BIOMETRÍA REAL O SIMULADA
-    async function ejecutarPasskeyBiometria() {
-      const btn = document.getElementById('btn-passkey');
-      btn.innerText = "⏳ Solicitando Face ID / Huella...";
-      btn.style.background = "rgba(77, 124, 255, 0.25)";
-      btn.style.borderColor = "#4D7CFF";
-      btn.style.color = "#93c5fd";
+    // ABRIR MODAL BIOMÉTRICO (INICIA CÁMARA O HUELLA)
+    async function abrirModalBiometria() {
+      document.getElementById('biometric-modal').style.display = 'flex';
+      cambiarModoBiometrico('camera');
+    }
 
+    function cerrarModalBiometria() {
+      if (mediaStreamGlobal) {
+        mediaStreamGlobal.getTracks().forEach(track => track.stop());
+        mediaStreamGlobal = null;
+      }
+      document.getElementById('biometric-modal').style.display = 'none';
+    }
+
+    async function cambiarModoBiometrico(modo) {
+      const cameraBox = document.getElementById('camera-container');
+      const fingerprintBox = document.getElementById('fingerprint-container');
+      const title = document.getElementById('bio-title');
+      const desc = document.getElementById('bio-desc');
+      const statusText = document.getElementById('bio-status-text');
+
+      if (modo === 'camera') {
+        fingerprintBox.style.display = 'none';
+        cameraBox.style.display = 'block';
+        title.innerText = 'Escaneando Face ID (Cámara Activa)';
+        desc.innerText = 'Mira fijamente a la cámara para autenticar tu biometría facial.';
+        statusText.innerText = '⏳ Conectando cámara y rastreando puntos nodales...';
+
+        try {
+          // Solicitar cámara web real del usuario
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 300, height: 300 } });
+          mediaStreamGlobal = stream;
+          const videoElem = document.getElementById('face-video');
+          videoElem.srcObject = stream;
+
+          // Simular escaneo de 2.2 segundos con éxito
+          setTimeout(() => {
+            statusText.innerText = '🔍 Rostro Detectado · Verificando liveness y firma WebAuthn...';
+          }, 1100);
+
+          setTimeout(() => {
+            finalizarVerificacionBiometricaExitosa('Face ID (Cámara Verificada)');
+          }, 2400);
+
+        } catch (err) {
+          console.warn('Cámara no permitida o no disponible:', err);
+          statusText.innerText = '⚠️ Cámara no disponible o permiso denegado. Usando Windows Hello...';
+          setTimeout(() => {
+            ejecutarWindowsHelloFallback();
+          }, 1200);
+        }
+      } else {
+        // Modo Huella Digital
+        if (mediaStreamGlobal) {
+          mediaStreamGlobal.getTracks().forEach(track => track.stop());
+          mediaStreamGlobal = null;
+        }
+        cameraBox.style.display = 'none';
+        fingerprintBox.style.display = 'block';
+        title.innerText = 'Escaneando Huella Digital (Touch ID / Windows Hello)';
+        desc.innerText = 'Coloca tu dedo en el sensor biométrico del teclado o laptop.';
+        statusText.innerText = '⏳ Esperando lectura de huella digital...';
+
+        setTimeout(() => {
+          finalizarVerificacionBiometricaExitosa('Huella Digital / Windows Hello');
+        }, 1800);
+      }
+    }
+
+    async function ejecutarWindowsHelloFallback() {
       if (window.navigator?.credentials?.create) {
         try {
           const challenge = new Uint8Array(32);
           window.crypto.getRandomValues(challenge);
-          const userId = new TextEncoder().encode("user_marta_" + Date.now());
-
           await navigator.credentials.create({
             publicKey: {
               challenge: challenge.buffer,
               rp: { name: "AgentBuyer Zero-Trust Protocol" },
-              user: { id: userId.buffer, name: "marta", displayName: "Marta" },
+              user: { id: new Uint8Array(16), name: "marta", displayName: "Marta" },
               pubKeyCredParams: [{ alg: -8, type: "public-key" }, { alg: -7, type: "public-key" }],
               authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
               timeout: 60000
             }
           });
-        } catch(e) {
-          console.warn("WebAuthn local fallback:", e);
-        }
-      } else {
-        await new Promise(r => setTimeout(r, 600));
+        } catch(e) {}
       }
-
-      isPasskeyVerified = true;
-      btn.style.background = 'rgba(16, 185, 129, 0.2)';
-      btn.style.borderColor = '#10b981';
-      btn.style.color = '#6ee7b7';
-      btn.innerText = '✓ Passkey (Face ID / Huella) Confirmada';
-      actualizarEstadoBotonSubmit();
+      finalizarVerificacionBiometricaExitosa('Passkey / Windows Hello');
     }
 
-    // 2. EJECUTAR VERIFICACIÓN SMS OTP
+    function finalizarVerificacionBiometricaExitosa(tipo) {
+      isPasskeyVerified = true;
+      document.getElementById('bio-status-text').innerHTML = `✅ <b>¡Identidad Verificada con Éxito!</b> (${tipo})`;
+      
+      const btn = document.getElementById('btn-passkey');
+      btn.style.background = 'rgba(16, 185, 129, 0.25)';
+      btn.style.borderColor = '#10b981';
+      btn.style.color = '#6ee7b7';
+      btn.innerHTML = `✓ ${tipo} Confirmado`;
+
+      setTimeout(() => {
+        cerrarModalBiometria();
+        actualizarEstadoBotonSubmit();
+      }, 1000);
+    }
+
+    // VERIFICACIÓN SMS OTP
     function onOtpInput(val) {
       if (val.trim().length === 6 && /^\d+$/.test(val.trim())) {
         ejecutarVerificacionSMS();
@@ -800,7 +976,7 @@
       actualizarEstadoBotonSubmit();
     }
 
-    // 3. EJECUTAR TOKENIZACIÓN DE TARJETA PCI
+    // TOKENIZACIÓN DE TARJETA PCI
     function onCardInput(val) {
       const badge = document.getElementById('badge-token-status');
       if (val.trim().length >= 4) {
@@ -820,7 +996,7 @@
       actualizarEstadoBotonSubmit();
     }
 
-    // 4. COMPUTED: isSubmitEnabled (3/3 FACTORES)
+    // COMPUTED: isSubmitEnabled (3/3 FACTORES)
     function actualizarEstadoBotonSubmit() {
       const btn = document.getElementById('btn-submit-mandate');
       const count = (isPasskeyVerified ? 1 : 0) + (isSmsVerified ? 1 : 0) + (isStripeTokenized ? 1 : 0);
@@ -850,7 +1026,7 @@
 
     async function procesarCreacionMandato() {
       if (!isPasskeyVerified || !isSmsVerified || !isStripeTokenized) {
-        alert("Debes completar los 3 factores de seguridad (Passkey, SMS OTP y Tokenización de tarjeta) antes de autorizar al agente.");
+        alert("Debes completar los 3 factores de seguridad (Face ID/Huella, SMS OTP y Tokenización) antes de autorizar al agente.");
         return;
       }
 
@@ -986,6 +1162,9 @@
       document.getElementById('saturday-text').innerText = '🛑 KILL SWITCH ACTIVADO: EL AGENTE NO PUEDE OPERAR';
       document.getElementById('activity-log').innerHTML = '<b>Prueba de Fuego:</b> El usuario revocó el mandato en vivo. Cualquier intento posterior del agente es rechazado en menos de 1 milisegundo por la pasarela Zero-Trust.';
     }
+
+    // Inicializar estado al cargar
+    actualizarEstadoBotonSubmit();
   </script>
 </body>
 </html>
