@@ -17,6 +17,15 @@ from __future__ import annotations
 from typing import Any
 
 
+def _normalize_attempt(attempt: dict) -> dict:
+    """Acepta el shape plano del contrato Y el anidado que envía core/
+    ({"purchase": {...}}) — el engine es defensivo con cualquiera de los dos."""
+    purchase = attempt.get("purchase")
+    if isinstance(purchase, dict):
+        return purchase
+    return attempt
+
+
 def _fmt(n: Any) -> str: #make it string
     """150.0 -> '150', 149.99 -> '149.99' — keeps details readable in the demo UI."""
     if isinstance(n, float) and n == int(n):
@@ -88,6 +97,7 @@ _CONSTRAINT_CHECKS = [
 def evaluate(mandate: dict, live_state: dict, attempt: dict) -> dict:
     try:
         constraints = mandate.get("constraints", {})
+        attempt = _normalize_attempt(attempt)
         checks: list[dict] = []
 
         for key, check_fn in _CONSTRAINT_CHECKS:
