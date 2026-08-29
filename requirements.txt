@@ -1,1 +1,8 @@
-# Dependencies go here: fastapi, uvicorn, pydantic, streamlit, requests, anthropic (bonus).
+fastapi>=0.110.0
+uvicorn>=0.28.0
+pydantic>=2.6.0
+streamlit>=1.32.0
+cryptography>=42.0.0
+requests>=2.31.0
+pytest>=8.0.0
+pandas>=2.2.0
