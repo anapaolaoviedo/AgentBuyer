@@ -77,9 +77,9 @@ def _check_uses(constraints: dict, live_state: dict, attempt: dict) -> dict:
 def _check_condition_price_below(condition: dict, live_state: dict, attempt: dict) -> dict:
     limit = condition.get("value")
     price = attempt.get("metadata", {}).get("price", attempt.get("amount"))
-    ok = price is not None and limit is not None and price <= limit
+    ok = price is not None and limit is not None and price < limit
     detail = (
-        f"{_fmt(price)} <= {_fmt(limit)}" if ok
+        f"{_fmt(price)} < {_fmt(limit)}" if ok
         else f"{_fmt(price)} no es menor que {_fmt(limit)}"
     )
     return {"rule": "condition.price_below", "pass": ok, "detail": detail}
@@ -181,9 +181,22 @@ def evaluate(mandate: dict, live_state: dict, attempt: dict) -> dict:
             reason = "Todas las restricciones satisfechas"
         else:
             verdict = "ESCALATE"
+            failed_names = []
+            for c in failed:
+                r = c["rule"]
+                if r == "amount":
+                    failed_names.append("Monto excede el máximo")
+                elif r == "category":
+                    failed_names.append("Categoría no permitida")
+                elif r == "merchant":
+                    failed_names.append("Comercio no permitido")
+                elif r == "uses":
+                    failed_names.append("Usos agotados")
+                else:
+                    failed_names.append(r)
             reason = (
-                "Requiere aprobación humana: falló "
-                + ", ".join(c["rule"] for c in failed)
+                "Requiere aprobación humana: "
+                + "; ".join(failed_names)
             )
 
         return {"verdict": verdict, "checks": checks, "reason": reason}
