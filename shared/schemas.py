@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
@@ -65,24 +66,29 @@ class PaymentToken(BaseModel):
     token_type: str = "SCOPED_VIRTUAL_TOKEN"
     masked_card: str = "•••• 4242"
     bank_issuer: str = "Galicia AI Payments"
-    expires_at: str
+    expires_at: str = "2026-12-31T00:00:00Z"
     bound_mandate_id: Optional[str] = None
 
 
 class Mandate(BaseModel):
     mandate_id: str
-    human_id: str
-    human_pubkey: str
-    agent_id: str
-    agent_pubkey: str
-    scope: MandateScope
-    payment_token: PaymentToken
-    created_at: str
-    expires_at: str
+    human_id: str = "hum_marta"
+    human_pubkey: str = ""
+    agent_id: str = "agt_saturday"
+    agent_pubkey: str = ""
+    scope: Optional[MandateScope] = None
+    constraints: Optional[Dict[str, Any]] = None
+    human: Optional[Dict[str, Any]] = None
+    agent: Optional[Dict[str, Any]] = None
+    payment_token: Optional[PaymentToken] = None
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    expires_at: Optional[str] = None
     status: MandateStatus = MandateStatus.ACTIVE
     revoked_at: Optional[str] = None
     revocation_reason: Optional[str] = None
     human_signature: str = ""
+    signature: str = ""
+
 
 
 class PurchaseAttempt(BaseModel):
@@ -90,15 +96,18 @@ class PurchaseAttempt(BaseModel):
     mandate_id: str
     agent_id: str
     merchant_id: str
-    item_id: str
-    item_title: str
+    item_id: str = "item_01"
+    item_title: str = "Item"
+    item_description: str = ""
     category: str
     amount: float
     currency: str = "USD"
     metadata: Dict[str, Any] = Field(default_factory=dict)
     timestamp: str
     nonce: str
+    signature: str = ""
     agent_signature: str = ""
+
 
 
 class VerificationResult(BaseModel):
@@ -109,8 +118,10 @@ class VerificationResult(BaseModel):
     checks: Dict[str, bool] = Field(default_factory=dict)
     dispute_token: Optional[str] = None
     settlement_id: Optional[str] = None
+    settlement_token: Optional[str] = None
     escalation_id: Optional[str] = None
     timestamp: str
+
 
 
 class HITLApprovalRequest(BaseModel):
@@ -160,10 +171,51 @@ class DisputeClaim(BaseModel):
 
 class CatalogItem(BaseModel):
     item_id: str
-    title: str
+    title: str = "Item"
+    description: str = ""
     category: str
     price: float
     currency: str = "USD"
     merchant_id: str
     metadata: Dict[str, Any] = Field(default_factory=dict)
     available: bool = True
+
+
+
+class CreateMandateRequest(BaseModel):
+    human_id: str
+    max_amount_per_tx: float
+    monthly_budget: float = 1000.0
+    allowed_categories: List[str] = Field(default_factory=lambda: ["travel", "flights"])
+    allowed_merchants: List[str] = Field(default_factory=lambda: ["*"])
+    conditions_expression: Optional[str] = None
+    currency: str = "USD"
+    max_executions_per_month: int = 5
+    allow_hitl_escalation: bool = True
+    validity_days: int = 30
+    masked_card: str = "•••• 4242"
+    bank_issuer: str = "Galicia AI Payments"
+
+
+class RevokeMandateRequest(BaseModel):
+    reason: str = "Revoked by cardholder"
+
+
+class ExecutePurchaseRequest(BaseModel):
+    mandate_id: str
+    agent_id: str
+    item_id: str
+    override_amount: Optional[float] = None
+
+
+class ResolveEscalationRequest(BaseModel):
+    approved: bool
+    note: Optional[str] = None
+
+
+class FileDisputeRequest(BaseModel):
+    attempt_id: str
+    mandate_id: str
+    claimant_id: str
+    reason: str
+

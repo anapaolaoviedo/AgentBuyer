@@ -36,7 +36,19 @@ class MandateStore:
                     "revoked_at": m_obj.revoked_at,
                 },
             }
+            try:
+                from audit.log import audit_ledger
+                audit_ledger.append_entry(
+                    event_type="MANDATE_CREATED",
+                    actor_type="HUMAN",
+                    actor_id=m_obj.human_id,
+                    mandate_id=mandate_id,
+                    details={"scope": m_obj.scope.model_dump() if m_obj.scope else {}},
+                )
+            except Exception:
+                pass
             return m_obj
+
 
     def get_mandate(self, mandate_id: str) -> Optional[Mandate]:
         with self._lock:

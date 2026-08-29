@@ -57,7 +57,7 @@ class PurchasingAgent:
             "currency": item.currency,
             "timestamp": timestamp,
             "nonce": nonce,
-            "item_description": item.description,
+            "item_description": getattr(item, "description", getattr(item, "title", "Vuelo")),
             "metadata": item.metadata,
         }
 
@@ -69,22 +69,25 @@ class PurchasingAgent:
         return PurchaseAttempt(
             **unsigned_dict,
             signature=signature,
+            agent_signature=signature,
         )
+
 
     def attempt_purchase(
         self,
         mandate: Mandate,
         item: CatalogItem,
-        merchant: VuelaYaMerchant,
+        merchant: Optional[VuelaYaMerchant] = None,
         override_amount: Optional[float] = None,
         tampered_nonce: Optional[str] = None,
         tampered_agent_id: Optional[str] = None,
         forge_signature: bool = False,
     ) -> Tuple[PurchaseAttempt, VerificationResult]:
+        actual_merchant = merchant if merchant is not None else vuelaya_merchant
         attempt = self.create_signed_attempt(
             mandate=mandate,
             item=item,
-            merchant_id=merchant.merchant_id,
+            merchant_id=actual_merchant.merchant_id,
             override_amount=override_amount,
             tampered_nonce=tampered_nonce,
             tampered_agent_id=tampered_agent_id,
@@ -92,14 +95,15 @@ class PurchasingAgent:
         )
 
         from core.verify import gateway
-        result = gateway.verify_and_authorize(attempt, mandate, merchant_pubkey=merchant.pubkey)
+        result = gateway.verify_and_authorize(attempt, mandate, merchant_pubkey=actual_merchant.pubkey)
 
         if result.authorized:
-            merchant.record_settlement(
+            actual_merchant.record_settlement(
                 attempt_id=attempt.attempt_id,
                 settlement_token=result.settlement_token,
                 amount=attempt.amount,
             )
+
 
         self.purchase_history.append({
             "attempt": attempt.model_dump(),

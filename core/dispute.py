@@ -56,7 +56,8 @@ class DisputeArbiter:
 
     def resolve_dispute(self, claim: DisputeClaim) -> DisputeClaim:
         mandate = mandate_store.get_mandate(claim.mandate_id)
-        evidence_entries = audit_ledger.get_trail_for("auditor", mandate_id=claim.mandate_id, attempt_id=claim.attempt_id)
+        raw_evidence = audit_ledger.get_trail_for("auditor", mandate_id=claim.mandate_id, attempt_id=claim.attempt_id)
+        evidence_entries = [e.model_dump() if hasattr(e, "model_dump") else e for e in raw_evidence]
         
         claim.audit_evidence = evidence_entries
 
@@ -113,8 +114,15 @@ class DisputeArbiter:
                     return claim
 
         # Rule 3: Check if purchase was verified or HITL approved
-        verification_events = [e for e in evidence_entries if e.get("event_type") == EventType.VERIFICATION_SUCCESS.value]
-        hitl_events = [e for e in evidence_entries if e.get("event_type") == EventType.HITL_APPROVED.value]
+        valid_event_types = {
+            EventType.VERIFICATION_SUCCESS.value,
+            EventType.SETTLEMENT_COMPLETED.value,
+            "SETTLEMENT_COMPLETED",
+            "VERIFICATION_SUCCESS",
+            "verification",
+        }
+        verification_events = [e for e in evidence_entries if e.get("event_type") in valid_event_types]
+        hitl_events = [e for e in evidence_entries if e.get("event_type") in {EventType.HITL_APPROVED.value, "HITL_APPROVED"}]
 
         if not verification_events and not hitl_events:
             claim.status = "RESOLVED"
@@ -124,6 +132,7 @@ class DisputeArbiter:
             claim.explanation = "No valid verification success or HITL approval record found in the immutable audit ledger."
             self._log_resolution(claim)
             return claim
+
 
         # Rule 4: Valid purchase within authorized mandate
         claim.status = "RESOLVED"

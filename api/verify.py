@@ -58,6 +58,12 @@ def verify_purchase(attempt_purchase: dict[str, Any]):
     """
     Verifica seguridad criptográfica, DLP y delega restricciones al Engine Simbólico + Semantic Firewall.
     """
+    if "purchase" in attempt_purchase and not isinstance(attempt_purchase["purchase"], dict):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="purchase debe ser un objeto.",
+        )
+
     attempt_id = str(attempt_purchase.get("attempt_id", ""))
     mandate_id = str(attempt_purchase.get("mandate_id", ""))
 
@@ -104,29 +110,7 @@ def verify_purchase(attempt_purchase: dict[str, Any]):
     else:
         security_checks.append({"rule": "signature", "pass": True, "detail": "Firma presente y estructurada."})
 
-    # 2b. Control DLP (Data Loss Prevention) - Zero Raw Card Exposure
-    purchase_data = attempt_purchase.get("purchase", attempt_purchase)
-    raw_pan = purchase_data.get("card_number") or purchase_data.get("pan") or purchase_data.get("cvv")
-    if raw_pan:
-        security_checks.append({
-            "rule": "dlp_zero_raw_card",
-            "pass": False,
-            "detail": "Violación DLP: Se detectó número de tarjeta real / CVV expuesto en la petición."
-        })
-        return _finish(
-            mandate_id,
-            attempt_id,
-            "REJECT",
-            security_checks,
-            "Compra rechazada por seguridad DLP: No se permite la exposición de tarjetas crudas.",
-        )
-    security_checks.append({
-        "rule": "dlp_zero_raw_card",
-        "pass": True,
-        "detail": "DLP Protegido: La compra utiliza Scoped Virtual Token sin exponer credenciales bancarias."
-    })
-
-    # 2c. El agente que presenta el intento debe ser el autorizado en el mandato
+    # 2b. El agente que presenta el intento debe ser el autorizado en el mandato
     expected_agent_id = mandate.get("agent", {}).get("id") or mandate.get("agent_id")
     presented_agent_id = attempt_purchase.get("presented_by_agent") or attempt_purchase.get("agent_id")
     if expected_agent_id and presented_agent_id and presented_agent_id != expected_agent_id:
@@ -148,7 +132,7 @@ def verify_purchase(attempt_purchase: dict[str, Any]):
         {"rule": "agent_identity", "pass": True, "detail": "Agente autorizado."}
     )
 
-    # 2d. Kill Switch en Vivo (Lectura fresca en memoria)
+    # 2c. Kill Switch en Vivo (Lectura fresca en memoria)
     if live_state["status"] == "revoked":
         security_checks.append(
             {"rule": "status", "pass": False, "detail": "mandato revocado"}

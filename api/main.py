@@ -52,7 +52,22 @@ app.add_middleware(
 _key_registry: Dict[str, Dict[str, str]] = {}
 
 
+@app.on_event("startup")
+def load_seed_mandates():
+    seed_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "shared", "seed_mandates.json")
+    if os.path.exists(seed_path):
+        import json
+        with open(seed_path, "r", encoding="utf-8") as f:
+            seeds = json.load(f)
+            for m in seeds:
+                try:
+                    store_create_mandate(m)
+                except Exception:
+                    pass
+
+
 def _get_or_create_keys(entity_id: str) -> Dict[str, str]:
+
     if entity_id not in _key_registry:
         priv, pub = generate_keypair()
         _key_registry[entity_id] = {"priv": priv, "pub": pub}
@@ -183,13 +198,22 @@ def api_list_mandates(human_id: Optional[str] = None):
 
 @app.get("/mandates/{mandate_id}")
 def api_get_mandate(mandate_id: str):
+    rec = store_get_mandate(mandate_id)
+    if rec is not None:
+        return rec
     mandate = mandate_store.get_mandate(mandate_id)
-    if not mandate:
-        rec = store_get_mandate(mandate_id)
-        if rec:
-            return rec
-        raise HTTPException(status_code=404, detail="Mandate not found")
-    return mandate
+    if mandate is not None:
+        return {
+            "mandate": mandate.model_dump(),
+            "live_state": {
+                "status": mandate.status.value.lower(),
+                "uses_count": 0,
+                "amount_spent": 0.0,
+                "revoked_at": mandate.revoked_at,
+            },
+        }
+    raise HTTPException(status_code=404, detail="Mandate not found")
+
 
 
 @app.post("/mandates/{mandate_id}/revoke")

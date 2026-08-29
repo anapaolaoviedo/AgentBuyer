@@ -22,7 +22,8 @@ class MandateStateManager:
     def __init__(self):
         self._states: Dict[str, MandateRollingState] = {}
         self._all_nonces: Set[str] = set()
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+
 
     def get_state(self, mandate_id: str) -> MandateRollingState:
         with self._lock:

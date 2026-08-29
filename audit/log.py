@@ -90,11 +90,12 @@ class CryptographicAuditLedger:
             )
 
             entry = AuditLogEntry(
+                entry_id=f"evt_{uuid4().hex[:10]}",
                 index=index,
                 prev_hash=prev_hash,
                 timestamp=timestamp,
-                event_type=EventType(e_type_str) if e_type_str in [e.value for e in EventType] else EventType.ATTEMPT_EVALUATED,
-                actor_type=ActorType(a_type_str) if a_type_str in [a.value for a in ActorType] else ActorType.GATEWAY,
+                event_type=e_type_str,
+                actor_type=a_type_str,
                 actor_id=actor_id,
                 mandate_id=mandate_id,
                 attempt_id=attempt_id,
@@ -139,9 +140,19 @@ class CryptographicAuditLedger:
         with self._lock:
             return [e.model_copy(deep=True) for e in self._entries]
 
+    def get_trail_for(self, role: str = "auditor", mandate_id: Optional[str] = None, attempt_id: Optional[str] = None) -> List[AuditLogEntry]:
+        with self._lock:
+            entries = self._entries
+            if mandate_id:
+                entries = [e for e in entries if e.mandate_id == mandate_id]
+            if attempt_id:
+                entries = [e for e in entries if e.attempt_id == attempt_id]
+            return [e.model_copy(deep=True) for e in entries]
+
     def clear(self) -> None:
         with self._lock:
             self._entries.clear()
+
 
 
 # Global singleton audit ledger

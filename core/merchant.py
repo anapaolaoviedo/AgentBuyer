@@ -30,7 +30,10 @@ class VuelaYaMerchant:
     MERCHANT_NAME = "VuelaYa Travel Agency"
 
     def __init__(self):
+        self.merchant_id = self.MERCHANT_ID
+        self.pubkey = "vuelaya_pubkey_ed25519"
         self.catalog: Dict[str, CatalogItem] = {
+
             "FLIGHT_COR_130": CatalogItem(
                 item_id="FLIGHT_COR_130",
                 title="Vuelo Buenos Aires (AEP) -> Córdoba (COR) [Promo]",
@@ -107,6 +110,15 @@ class VuelaYaMerchant:
     def get_item(self, item_id: str) -> Optional[CatalogItem]:
         return self.catalog.get(item_id)
 
+    def record_settlement(self, attempt_id: str, settlement_token: Optional[str] = None, amount: float = 0.0):
+        self.settled_orders.append({
+            "attempt_id": attempt_id,
+            "settlement_id": settlement_token,
+            "settlement_token": settlement_token,
+            "amount": amount,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+
     def process_purchase(self, attempt: PurchaseAttempt) -> VerificationResult:
         """
         Receives an agent's purchase attempt and executes the independent verification protocol.
@@ -124,6 +136,7 @@ class VuelaYaMerchant:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             })
         return result
+
 
 
 # Global merchant singleton
