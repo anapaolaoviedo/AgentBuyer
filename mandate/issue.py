@@ -1,9 +1,30 @@
+import time
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Optional, List, Dict, Any
-
+from typing import List, Optional, Union
 from shared.schemas import Mandate, MandateScope, MandateStatus, PaymentToken
 from mandate.sign import sign_payload
+
+
+def emitir_mandato(user_id: str, flight_offer_id: str, amount: float, currency: str, secret_key: bytes):
+    """Genera un token temporal y de un solo uso vinculado estrictamente a la intención del usuario."""
+    mandate_id = f"mandate_{uuid.uuid4().hex[:8]}"
+    purchase_id = f"purchase_{uuid.uuid4().hex[:8]}"
+    
+    payload = {
+        "mandate_id": mandate_id,
+        "user_id": user_id,
+        "purchase_id": purchase_id,
+        "flight_offer_id": flight_offer_id,
+        "amount": amount,
+        "currency": currency,
+        "single_use": True,
+        "status": "active",
+        "iat": int(time.time()),
+        "exp": int(time.time()) + 300  # Expira en 5 minutos (privilegios temporales estrictos)
+    }
+    
+    signed_token = sign_payload(payload, secret_key)
+    return signed_token, mandate_id
 
 
 def create_mandate(
@@ -13,9 +34,9 @@ def create_mandate(
     agent_id: str,
     agent_pubkey: str,
     max_amount_per_tx: float,
-    monthly_budget: float = 500.0,
-    allowed_categories: Optional[List[str]] = None,
-    allowed_merchants: Optional[List[str]] = None,
+    monthly_budget: float,
+    allowed_categories: List[str],
+    allowed_merchants: List[str],
     conditions_expression: Optional[str] = None,
     currency: str = "USD",
     max_executions_per_month: int = 5,
@@ -25,17 +46,13 @@ def create_mandate(
     bank_issuer: str = "Galicia AI Payments",
 ) -> Mandate:
     """
-    Creates and digitally signs a new purchase mandate.
-    Zero raw card details are stored: a cryptographically bound scoped payment token is generated.
+    Creates and cryptographically signs a purchasing mandate.
+    Generates a Scoped Virtual Payment Token guaranteeing zero raw credit card exposure.
     """
-    if allowed_categories is None:
-        allowed_categories = ["travel", "flights"]
-    if allowed_merchants is None:
-        allowed_merchants = ["*"]
-
     mandate_id = f"mnd_{uuid.uuid4().hex[:10]}"
-    now = datetime.now(timezone.utc)
-    expires_at = now + timedelta(days=validity_days)
+    now = time.time()
+    created_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
+    expires_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now + validity_days * 86400))
 
     scope = MandateScope(
         max_amount_per_tx=max_amount_per_tx,
@@ -53,11 +70,11 @@ def create_mandate(
         token_type="SCOPED_VIRTUAL_TOKEN",
         masked_card=masked_card,
         bank_issuer=bank_issuer,
-        expires_at=expires_at.isoformat(),
+        expires_at=expires_at,
         bound_mandate_id=mandate_id,
     )
 
-    unsigned_mandate_dict: Dict[str, Any] = {
+    unsigned_payload = {
         "mandate_id": mandate_id,
         "human_id": human_id,
         "human_pubkey": human_pubkey,
@@ -65,15 +82,14 @@ def create_mandate(
         "agent_pubkey": agent_pubkey,
         "scope": scope.model_dump(),
         "payment_token": payment_token.model_dump(),
-        "created_at": now.isoformat(),
-        "expires_at": expires_at.isoformat(),
+        "created_at": created_at,
+        "expires_at": expires_at,
         "status": MandateStatus.ACTIVE.value,
     }
 
-    # Digital signature by the human binding all terms and payment token
-    signature = sign_payload(human_privkey, unsigned_mandate_dict)
+    signature = sign_payload(unsigned_payload, human_privkey)
 
-    mandate = Mandate(
+    return Mandate(
         mandate_id=mandate_id,
         human_id=human_id,
         human_pubkey=human_pubkey,
@@ -81,10 +97,8 @@ def create_mandate(
         agent_pubkey=agent_pubkey,
         scope=scope,
         payment_token=payment_token,
-        created_at=now.isoformat(),
-        expires_at=expires_at.isoformat(),
+        created_at=created_at,
+        expires_at=expires_at,
         status=MandateStatus.ACTIVE,
         human_signature=signature,
     )
-
-    return mandate
