@@ -20,16 +20,10 @@ type Constraints = {
   allowed_merchants?: string[];
   max_uses?: number;
   conditions?: Condition[];
-  off_session_consent?: boolean;
 };
 
 type MandateRecord = {
-  mandate: {
-    mandate_id: string;
-    human?: { name?: string };
-    constraints?: Constraints;
-    payment_token?: { token_id?: string; masked_card?: string; token_type?: string };
-  };
+  mandate: { mandate_id: string; human?: { name?: string }; constraints?: Constraints };
   live_state: LiveState;
 };
 
@@ -99,10 +93,10 @@ function MissionControl({ mandateId, onCreateNew }: MissionControlProps) {
   );
   const phaseCopy: Record<DecisionPhase, string> = {
     idle: "",
-    discovering: "Descubriendo vuelos en la red…",
-    evaluating: "Evaluando límites matemáticos…",
-    choosing: "Eligiendo mejor tarifa autónoma…",
-    verifying: "Verificando con Guardián Zero-Trust & GPT-4o…",
+    discovering: "Descubriendo vuelos…",
+    evaluating: "Evaluando límites…",
+    choosing: "Eligiendo la mejor opción…",
+    verifying: "Verificando con el guardián…",
   };
 
   const loadMission = useCallback(async (preserveSaturday = false) => {
@@ -128,6 +122,7 @@ function MissionControl({ mandateId, onCreateNew }: MissionControlProps) {
   async function runAgent() {
     setBusy("running");
     setError(null);
+    // Un nuevo intento no debe mostrar el veredicto ni relato del intento anterior.
     setVerification(null);
     setPendingVerification(null);
     setActivity(null);
@@ -136,6 +131,7 @@ function MissionControl({ mandateId, onCreateNew }: MissionControlProps) {
     setSaturdayState("thinking");
 
     try {
+      // Se inicia la operación real al comienzo; la UI solo demora su presentación.
       const agentRequest = request<AgentRun>("/agent/run", {
         method: "POST",
         body: JSON.stringify({ mandate_id: mandateId }),
@@ -150,6 +146,7 @@ function MissionControl({ mandateId, onCreateNew }: MissionControlProps) {
       setPhase("evaluating");
       await wait(850);
 
+      // La elección nunca se inventa: esperamos el vuelo devuelto por /agent/run.
       const run = await agentRequest;
       const result: Verification = run.verification ?? {
         verdict: run.verdict ?? "REJECT",
@@ -189,6 +186,7 @@ function MissionControl({ mandateId, onCreateNew }: MissionControlProps) {
       await request<MandateRecord>(`/mandates/${mandateId}/revoke`, { method: "POST" });
       const mandateData = await request<MandateRecord>(`/mandates/${mandateId}`);
       setMandate(mandateData);
+      // La aprobación anterior ya no representa el estado real del mandato.
       setVerification(null);
       setPendingVerification(null);
       setActivity(null);
@@ -216,8 +214,8 @@ function MissionControl({ mandateId, onCreateNew }: MissionControlProps) {
       <div className="mission-control">
         <header className="mission-header">
           <div>
-            <p className="mission-kicker">AGENTBUYER / PROTOCOLO ZERO-TRUST & DLP</p>
-            <h1>Mission Control: Compras Autónomas Delegadas</h1>
+            <p className="mission-kicker">AGENTBUYER / MISSION CONTROL</p>
+            <h1>Centro de confianza para compras de agentes</h1>
           </div>
           <div className="mission-header-actions">
             <button className="new-mandate-button" onClick={onCreateNew} disabled={busy !== null} type="button">+ CREAR NUEVO MANDATO</button>
@@ -227,24 +225,13 @@ function MissionControl({ mandateId, onCreateNew }: MissionControlProps) {
           </div>
         </header>
 
-        {error && <div className="connection-error" role="alert"><strong>No hay conexión con el backend:</strong> {error} Comprueba que FastAPI esté activo en el puerto 8000.</div>}
+        {error && <div className="connection-error" role="alert"><strong>No hay conexión con el sistema.</strong> {error} Comprueba que FastAPI esté activo en el puerto 8000.</div>}
 
         <section className="mandate-panel">
           <div className="mandate-heading">
             <div>
               <p className="panel-eyebrow">MANDATO ACTIVO · {mandate?.mandate.human?.name ?? "MARTA"}</p>
               <h2>{mandate?.mandate.mandate_id ?? mandateId}</h2>
-              <div style={{ display: "flex", gap: "8px", marginTop: "6px", flexWrap: "wrap" }}>
-                <span style={{ background: "rgba(59, 130, 246, 0.2)", color: "#93c5fd", padding: "3px 8px", borderRadius: "12px", fontSize: "0.75rem", border: "1px solid rgba(59, 130, 246, 0.4)" }}>
-                  🛡️ DLP: {mandate?.mandate.payment_token?.masked_card ?? "•••• 4242"} ({mandate?.mandate.payment_token?.token_id ?? "Scoped Token"})
-                </span>
-                <span style={{ background: "rgba(16, 185, 129, 0.2)", color: "#6ee7b7", padding: "3px 8px", borderRadius: "12px", fontSize: "0.75rem", border: "1px solid rgba(16, 185, 129, 0.4)" }}>
-                  🔐 Passkey Ed25519 Firmado
-                </span>
-                <span style={{ background: "rgba(168, 85, 247, 0.2)", color: "#d8b4fe", padding: "3px 8px", borderRadius: "12px", fontSize: "0.75rem", border: "1px solid rgba(168, 85, 247, 0.4)" }}>
-                  🌙 Off-Session Habilitado
-                </span>
-              </div>
             </div>
             <span className={`status-pill status-${status}`}>{statusLabel}</span>
           </div>
@@ -283,21 +270,21 @@ function MissionControl({ mandateId, onCreateNew }: MissionControlProps) {
           </aside>
 
           <section className="saturday-command">
-            <p className="agent-label">SATURDAY / AGENTE AUTÓNOMO OFF-SESSION</p>
+            <p className="agent-label">SATURDAY / AGENTE AUTORIZADO</p>
             <Saturday state={saturdayState} />
             <p className={`saturday-state state-${saturdayState}`}>{phase !== "idle" ? phaseCopy[phase] : saturdayState.toUpperCase()}</p>
             <div className="action-stack">
               <button className="run-button" onClick={() => void runAgent()} disabled={busy !== null} type="button">
-                {busy === "running" ? "SATURDAY ESTÁ DECIDIENDO…" : "EJECUTAR COMPRA AUTÓNOMA"}
+                {busy === "running" ? "SATURDAY ESTÁ DECIDIENDO…" : "CORRER AGENTE"}
               </button>
               <button className="revoke-button" onClick={() => void revokeMandate()} disabled={busy !== null || status === "revoked"} type="button">
-                {busy === "revoking" ? "REVOCANDO…" : status === "revoked" ? "MANDATO REVOCADO" : "REVOCAR MANDATO (<1MS)"}
+                {busy === "revoking" ? "REVOCANDO…" : status === "revoked" ? "MANDATO REVOCADO" : "REVOCAR MANDATO"}
               </button>
             </div>
           </section>
 
           <aside className="side-panel verification-panel">
-            <div className="panel-title"><span>PASARELA ZERO-TRUST</span><small>{displayedVerification ? (phase === "verifying" ? "ESCANEANDO" : "ÚLTIMO INTENTO") : "EN ESPERA"}</small></div>
+            <div className="panel-title"><span>PANEL DE VERIFICACIÓN</span><small>{displayedVerification ? (phase === "verifying" ? "ESCANEANDO" : "ÚLTIMO INTENTO") : "EN ESPERA"}</small></div>
             {displayedVerification ? (
               <>
                 {phase === "verifying" ? <div className="verdict verdict-scanning">VERIFICANDO</div> : <div className={`verdict verdict-${displayedVerification.verdict.toLowerCase()}`}>{displayedVerification.verdict}</div>}
@@ -311,12 +298,12 @@ function MissionControl({ mandateId, onCreateNew }: MissionControlProps) {
                   </AnimatePresence>
                 </div>
               </>
-            ) : <p className="empty-copy">{status === "revoked" ? "Mandato revocado — corre el agente para ver el resultado real del siguiente intento." : "Ejecuta a Saturday para ver los checks reales de seguridad y DLP."}</p>}
+            ) : <p className="empty-copy">{status === "revoked" ? "Mandato revocado — corre el agente para ver el resultado real del siguiente intento." : "Corre a Saturday para ver los checks reales del backend."}</p>}
           </aside>
         </section>
 
         <section className="activity-panel">
-          <div className="panel-title"><span>ACTIVIDAD DEL AGENTE & AUDITORÍA</span><small>{activity ? "REGISTRO REAL" : "SIN EJECUCIONES"}</small></div>
+          <div className="panel-title"><span>ACTIVIDAD DEL AGENTE</span><small>{activity ? "REGISTRO REAL" : "SIN EJECUCIONES"}</small></div>
           {activity ? (
             <div className="activity-content">
               <p>{activity.human_readable ?? activity.verification?.human_readable ?? "Saturday terminó su evaluación."}</p>
