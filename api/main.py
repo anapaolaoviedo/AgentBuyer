@@ -3,6 +3,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
+from audit.log import append_entry
 from core.mandate_store import create_mandate, get_mandate, revoke_mandate
 from core.seed_loader import load_seed_mandates
 
@@ -38,7 +39,15 @@ def create_mandate_endpoint(mandate: dict[str, Any]):
         )
 
     try:
-        return create_mandate(mandate)
+        record = create_mandate(mandate)
+        append_entry(
+            {
+                "type": "mandate_created",
+                "mandate_id": mandate_id,
+                "summary": f"Mandato creado para {mandate.get('human', {}).get('display_name', 'la persona autorizante')}.",
+            }
+        )
+        return record
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=str(error)
@@ -57,9 +66,18 @@ def get_mandate_endpoint(mandate_id: str):
 @app.post("/mandates/{mandate_id}/revoke")
 def revoke_mandate_endpoint(mandate_id: str):
     """Revoca el mandato inmediatamente en la fuente de verdad en memoria."""
+    previous = get_mandate(mandate_id)
     record = revoke_mandate(mandate_id)
     if record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mandato no encontrado.")
+    if previous is not None and previous["live_state"]["status"] != "revoked":
+        append_entry(
+            {
+                "type": "revocation",
+                "mandate_id": mandate_id,
+                "summary": "Mandato revocado por la persona autorizante.",
+            }
+        )
     return record
 
 
@@ -70,7 +88,9 @@ app.include_router(verify_router)
 
 # Comercio y agente de la demo de Fase 3.
 from api.agent import router as agent_router
+from api.audit import router as audit_router
 from api.merchant import router as merchant_router
 
 app.include_router(agent_router)
+app.include_router(audit_router)
 app.include_router(merchant_router)

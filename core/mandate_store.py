@@ -8,10 +8,6 @@ from datetime import datetime, timezone
 # No se debe cachear su contenido en los endpoints de verificación futuros.
 MANDATES: dict[str, dict] = {}
 
-# Eventos internos para el audit trail futuro. Todavía no se exponen por API.
-VERIFICATION_EVENTS: list[dict] = []
-
-
 def create_mandate(mandate: dict) -> dict:
     """Guarda un mandato nuevo con su estado vivo inicial."""
     mandate_id = mandate["mandate_id"]
@@ -62,15 +58,3 @@ def apply_approved_purchase(mandate_id: str, amount: int | float) -> dict | None
     return get_mandate(mandate_id)
 
 
-def record_verification_event(
-    mandate_id: str, attempt_id: str, verdict: str, timestamp: str
-) -> None:
-    """Guarda el mínimo necesario para construir el audit trail después."""
-    VERIFICATION_EVENTS.append(
-        {
-            "mandate_id": mandate_id,
-            "attempt_id": attempt_id,
-            "verdict": verdict,
-            "timestamp": timestamp,
-        }
-    )
