@@ -34,9 +34,9 @@ def create_mandate(
     agent_id: str,
     agent_pubkey: str,
     max_amount_per_tx: float,
-    monthly_budget: float,
-    allowed_categories: List[str],
-    allowed_merchants: List[str],
+    monthly_budget: float = 500.0,
+    allowed_categories: Optional[List[str]] = None,
+    allowed_merchants: Optional[List[str]] = None,
     conditions_expression: Optional[str] = None,
     currency: str = "USD",
     max_executions_per_month: int = 5,
@@ -49,6 +49,11 @@ def create_mandate(
     Creates and cryptographically signs a purchasing mandate.
     Generates a Scoped Virtual Payment Token guaranteeing zero raw credit card exposure.
     """
+    if allowed_categories is None:
+        allowed_categories = ["travel.flights", "travel"]
+    if allowed_merchants is None:
+        allowed_merchants = ["*"]
+
     mandate_id = f"mnd_{uuid.uuid4().hex[:10]}"
     now = time.time()
     created_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))

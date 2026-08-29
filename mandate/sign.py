@@ -12,8 +12,15 @@ def encode_b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).decode('utf-8').rstrip('=')
 
 
-def sign_payload(payload_dict: dict, secret_key: Union[bytes, str] = b"aegis_zero_trust_enterprise_2026") -> str:
+def sign_payload(arg1: Any, arg2: Any = b"aegis_zero_trust_enterprise_2026") -> str:
     """Sella criptográficamente el mandato para evitar manipulación (Tamper-proofing)."""
+    if isinstance(arg1, dict):
+        payload_dict = arg1
+        secret_key = arg2
+    else:
+        payload_dict = arg2 if isinstance(arg2, dict) else {}
+        secret_key = arg1
+
     if isinstance(secret_key, str):
         # Si es una clave privada Ed25519 en hex (64 chars)
         if len(secret_key) == 64:
@@ -26,8 +33,10 @@ def sign_payload(payload_dict: dict, secret_key: Union[bytes, str] = b"aegis_zer
             except Exception:
                 pass
         key_bytes = secret_key.encode('utf-8')
-    else:
+    elif isinstance(secret_key, bytes):
         key_bytes = secret_key
+    else:
+        key_bytes = b"aegis_zero_trust_enterprise_2026"
 
     header = encode_b64url(b'{"alg":"HS256","typ":"JWT"}')
     payload = encode_b64url(json.dumps(payload_dict, sort_keys=True).encode('utf-8'))

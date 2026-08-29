@@ -181,6 +181,7 @@ def evaluate(mandate: dict, live_state: dict, attempt: dict) -> dict:
             reason = "Todas las restricciones satisfechas"
         else:
             verdict = "ESCALATE"
+            failed_rules = [c["rule"] for c in failed]
             failed_names = []
             for c in failed:
                 r = c["rule"]
@@ -195,8 +196,11 @@ def evaluate(mandate: dict, live_state: dict, attempt: dict) -> dict:
                 else:
                     failed_names.append(r)
             reason = (
-                "Requiere aprobación humana: "
+                "Requiere aprobación humana: falló "
+                + ", ".join(failed_rules)
+                + " ("
                 + "; ".join(failed_names)
+                + ")"
             )
 
         return {"verdict": verdict, "checks": checks, "reason": reason}
