@@ -1,7 +1,7 @@
-from fastapi import FastAPI, HTTPException, Query
+from typing import Dict, Any, List, Optional
+from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import Dict, Any, List, Optional
 
 from shared.schemas import (
     Mandate,
@@ -15,9 +15,14 @@ from shared.schemas import (
 )
 from mandate.sign import generate_keypair
 from mandate.issue import create_mandate
-from core.mandate_store import mandate_store
-from core.agent_loop import PurchasingAgent
-from core.merchant import vuelaya_merchant
+from core.mandate_store import (
+    mandate_store,
+    create_mandate as store_create_mandate,
+    get_mandate as store_get_mandate,
+    revoke_mandate as store_revoke_mandate,
+)
+from core.agent_loop import PurchasingAgent, run_agent
+from core.merchant import vuelaya_merchant, get_flights
 from core.verify import get_pending_escalations, resolve_escalation, verify_purchase
 from core.dispute import dispute_arbiter
 from audit.log import audit_ledger
@@ -98,6 +103,11 @@ def root():
     }
 
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 # Mandate Endpoints
 @app.post("/mandates/create", response_model=Mandate)
 def api_create_mandate(req: CreateMandateRequest):
@@ -126,25 +136,49 @@ def api_create_mandate(req: CreateMandateRequest):
     return mandate
 
 
+@app.post("/mandates", status_code=status.HTTP_201_CREATED)
+def create_mandate_endpoint(mandate: dict[str, Any]):
+    """Crea un mandato firmado y establece su estado vivo inicial."""
+    mandate_id = mandate.get("mandate_id")
+    if not isinstance(mandate_id, str) or not mandate_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El campo mandate_id es obligatorio y debe ser un texto no vacío.",
+        )
+
+    try:
+        return store_create_mandate(mandate)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(error)
+        ) from error
+
+
 @app.get("/mandates", response_model=List[Mandate])
 def api_list_mandates(human_id: Optional[str] = None):
     return mandate_store.list_mandates(human_id)
 
 
-@app.get("/mandates/{mandate_id}", response_model=Mandate)
+@app.get("/mandates/{mandate_id}")
 def api_get_mandate(mandate_id: str):
     mandate = mandate_store.get_mandate(mandate_id)
     if not mandate:
+        # Check dictionary store
+        rec = store_get_mandate(mandate_id)
+        if rec:
+            return rec
         raise HTTPException(status_code=404, detail="Mandate not found")
     return mandate
 
 
 @app.post("/mandates/{mandate_id}/revoke")
-def api_revoke_mandate(mandate_id: str, req: RevokeMandateRequest):
-    success = mandate_store.revoke_mandate(mandate_id, req.reason)
+def api_revoke_mandate(mandate_id: str, req: Optional[RevokeMandateRequest] = None):
+    reason = req.reason if req else "Revocado por el usuario"
+    success = mandate_store.revoke_mandate(mandate_id, reason)
+    store_revoke_mandate(mandate_id)
     if not success:
         raise HTTPException(status_code=404, detail="Mandate not found")
-    return {"status": "REVOKED", "mandate_id": mandate_id, "reason": req.reason}
+    return {"status": "REVOKED", "mandate_id": mandate_id, "reason": reason}
 
 
 @app.post("/mandates/{mandate_id}/pause")
@@ -167,6 +201,19 @@ def api_resume_mandate(mandate_id: str):
 @app.get("/merchant/catalog", response_model=List[CatalogItem])
 def api_get_catalog():
     return vuelaya_merchant.get_catalog()
+
+
+@app.get("/merchant/flights")
+def api_get_flights():
+    return get_flights()
+
+
+@app.post("/agent/run")
+def api_run_agent(payload: dict):
+    mandate_id = payload.get("mandate_id")
+    if not mandate_id:
+        raise HTTPException(status_code=422, detail="mandate_id is required")
+    return run_agent(mandate_id)
 
 
 @app.post("/purchases/execute")
@@ -256,3 +303,23 @@ def api_run_adversarial():
         "success": success,
         "message": "All 8 attack vectors evaluated." if success else "Some attacks breached perimeter.",
     }
+
+
+# Include modular routers if present
+try:
+    from api.verify import router as verify_router
+    app.include_router(verify_router)
+except ImportError:
+    pass
+
+try:
+    from api.agent import router as agent_router
+    app.include_router(agent_router)
+except ImportError:
+    pass
+
+try:
+    from api.merchant import router as merchant_router
+    app.include_router(merchant_router)
+except ImportError:
+    pass

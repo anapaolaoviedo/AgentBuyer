@@ -25,19 +25,16 @@ def verificar_semantica_con_llm(
 
     if not api_key:
         if not allow_offline_heuristic:
-            # Fail closed estricto: sin validación, la compra no se autoriza.
             return True, "No hay una API key configurada; compra rechazada por seguridad."
         
-        # Heurística conservadora offline (para tests y demos locales sin conexión)
+        # Heurística conservadora offline
         desc_lower = intento_desc.lower()
         cat_lower = categoria_permitida.lower()
         
-        # Detección de activos líquidos / evasión
         activos_prohibidos = ["gift card", "tarjeta regalo", "crypto", "bitcoin", "saldo", "vale", "cash", "voucher", "rolex", "joya"]
         if any(w in desc_lower for w in activos_prohibidos):
             return True, f"Detección de evasión o activo líquido prohibido en '{intento_desc}'."
             
-        # Coincidencia de categoría
         keywords = {
             "flight": ["vuelo", "flight", "aerolíneas", "airline", "pasaje", "aéreo", "boarding"],
             "travel": ["vuelo", "flight", "hotel", "hospedaje", "travel", "viaje", "traslado"],
@@ -50,7 +47,6 @@ def verificar_semantica_con_llm(
             
         return True, f"El artículo '{intento_desc}' no pertenece claramente a la categoría autorizada '{categoria_permitida}'."
 
-    # JSON Schema estricto para Structured Outputs
     schema = {
         "name": "veredicto_compra",
         "schema": {

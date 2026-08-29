@@ -1,8 +1,23 @@
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
+from copy import deepcopy
 
 from shared.schemas import CatalogItem, PurchaseAttempt, VerificationResult
 from core.verify import verify_purchase
+
+# Catálogo funcional mock VuelaYa
+FLIGHTS: list[dict] = [
+    {"id": "FLIGHT_COR_130", "route": "BUE->COR", "price": 130.0, "category": "travel.flights", "merchant_id": "merch_vuelaya"},
+    {"id": "FLIGHT_COR_145_TRAP", "route": "BUE->COR", "price": 145.0, "category": "travel.flights", "merchant_id": "merch_vuelaya"},
+    {"id": "FLIGHT_COR_300", "route": "BUE->COR", "price": 300.0, "category": "travel.flights", "merchant_id": "merch_vuelaya"},
+    {"id": "FLIGHT_MDZ_180", "route": "BUE->MDZ", "price": 180.0, "category": "travel.flights", "merchant_id": "merch_vuelaya"},
+    {"id": "HOTEL_COR_90", "route": "HOTEL-COR", "price": 90.0, "category": "hospitality", "merchant_id": "merch_vuelaya"},
+]
+
+
+def get_flights() -> list[dict]:
+    """Entrega una copia para que ningún cliente cambie el catálogo interno."""
+    return deepcopy(FLIGHTS)
 
 
 class VuelaYaMerchant:
@@ -19,7 +34,7 @@ class VuelaYaMerchant:
             "FLIGHT_COR_130": CatalogItem(
                 item_id="FLIGHT_COR_130",
                 title="Vuelo Buenos Aires (AEP) -> Córdoba (COR) [Promo]",
-                category="travel",
+                category="travel.flights",
                 price=130.0,
                 currency="USD",
                 merchant_id=self.MERCHANT_ID,
@@ -35,7 +50,7 @@ class VuelaYaMerchant:
             "FLIGHT_COR_300": CatalogItem(
                 item_id="FLIGHT_COR_300",
                 title="Vuelo Buenos Aires (AEP) -> Córdoba (COR) [Premium Last Minute]",
-                category="travel",
+                category="travel.flights",
                 price=300.0,
                 currency="USD",
                 merchant_id=self.MERCHANT_ID,
@@ -51,7 +66,7 @@ class VuelaYaMerchant:
             "FLIGHT_MDZ_180": CatalogItem(
                 item_id="FLIGHT_MDZ_180",
                 title="Vuelo Buenos Aires (AEP) -> Mendoza (MDZ)",
-                category="travel",
+                category="travel.flights",
                 price=180.0,
                 currency="USD",
                 merchant_id=self.MERCHANT_ID,

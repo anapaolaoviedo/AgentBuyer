@@ -2,6 +2,8 @@ import uuid
 import secrets
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple, List
+from numbers import Real
+from copy import deepcopy
 
 from shared.schemas import (
     Mandate,
@@ -12,7 +14,8 @@ from shared.schemas import (
     ActorType,
 )
 from mandate.sign import sign_payload
-from core.merchant import vuelaya_merchant, VuelaYaMerchant
+from core.merchant import vuelaya_merchant, VuelaYaMerchant, get_flights
+from core.mandate_store import VERIFICATION_EVENTS, get_mandate
 from audit.log import audit_ledger
 
 
@@ -38,10 +41,6 @@ class PurchasingAgent:
         tampered_agent_id: Optional[str] = None,
         forge_signature: bool = False,
     ) -> PurchaseAttempt:
-        """
-        Constructs and cryptographically signs a purchase attempt.
-        Supports security testing parameters to simulate rogue/tampered attempts.
-        """
         attempt_id = f"att_{uuid.uuid4().hex[:10]}"
         timestamp = datetime.now(timezone.utc).isoformat()
         nonce = tampered_nonce if tampered_nonce else secrets.token_hex(16)
@@ -94,9 +93,6 @@ class PurchasingAgent:
         tampered_agent_id: Optional[str] = None,
         forge_signature: bool = False,
     ) -> Tuple[PurchaseAttempt, VerificationResult]:
-        """
-        Executes the full purchase cycle: generate signed attempt -> send to merchant -> record receipt.
-        """
         if merchant is None:
             merchant = vuelaya_merchant
 
@@ -141,3 +137,79 @@ class PurchasingAgent:
         self.purchase_history.append(record)
 
         return attempt, verification_result
+
+
+def _price_limit(mandate: dict) -> int | float | None:
+    conditions = mandate.get("conditions")
+    limits = mandate.get("limits") or mandate.get("constraints", {})
+    candidates = [
+        mandate.get("price_below"),
+        mandate.get("max_amount_per_purchase"),
+        conditions.get("price_below") if isinstance(conditions, dict) else None,
+        limits.get("price_below") if isinstance(limits, dict) else None,
+        limits.get("max_amount_per_purchase") if isinstance(limits, dict) else None,
+    ]
+    for candidate in candidates:
+        if isinstance(candidate, Real) and not isinstance(candidate, bool):
+            return candidate
+    return None
+
+
+def run_agent(mandate_id: str) -> dict:
+    """Descubre, decide, intenta y registra el resultado de una compra."""
+    flights_seen = get_flights()
+    record = get_mandate(mandate_id)
+    mandate = record["mandate"] if record is not None else {}
+    limit = _price_limit(mandate)
+
+    eligible = [flight for flight in flights_seen if limit is not None and flight["price"] <= limit]
+    selected_flight = min(eligible or flights_seen, key=lambda flight: flight["price"])
+    attempt_id = f"att_agent_{uuid.uuid4().hex[:12]}"
+    agent_id = mandate.get("agent", {}).get("id", "agent_marta")
+    
+    attempt = {
+        "attempt_id": attempt_id,
+        "mandate_id": mandate_id,
+        "presented_by_agent": agent_id,
+        "purchase": {
+            "merchant_id": selected_flight["merchant_id"],
+            "category": selected_flight["category"],
+            "amount": selected_flight["price"],
+            "currency": "USD",
+            "description": f"Vuelo {selected_flight['route']}",
+            "metadata": {"flight_id": selected_flight["id"], "price": selected_flight["price"]},
+        },
+    }
+
+    from api.verify import verify_purchase as api_verify_purchase
+    verification = api_verify_purchase(attempt)
+    verdict = verification.get("verdict", "REJECT")
+    completed = verdict == "APPROVE"
+
+    VERIFICATION_EVENTS.append(
+        {
+            "mandate_id": mandate_id,
+            "attempt_id": attempt_id,
+            "verdict": verdict,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "event_type": "agent_run",
+        }
+    )
+
+    story = (
+        f"Encontró {len(flights_seen)} vuelos. "
+        + (f"Aplicó el límite price_below de {limit} USD y " if limit is not None else "No encontró un límite price_below utilizable y ")
+        + f"eligió {selected_flight['id']} ({selected_flight['route']}) por {selected_flight['price']} USD. "
+        + ("La compra fue completada tras recibir APPROVE." if completed else f"La compra no procedió: verify devolvió {verdict}. {verification.get('human_readable', '')}")
+    )
+    return {
+        "mandate_id": mandate_id,
+        "attempt_id": attempt_id,
+        "flights_seen": flights_seen,
+        "selected_flight": selected_flight,
+        "selection_reason": "Vuelo más barato dentro de price_below." if eligible else "No hubo vuelo dentro de price_below; se intentó el más barato disponible.",
+        "attempt": attempt,
+        "verification": verification,
+        "purchase_completed": completed,
+        "human_readable": story,
+    }
