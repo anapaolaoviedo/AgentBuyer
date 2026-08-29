@@ -40,7 +40,7 @@ from audit.log import audit_ledger
 from shared.schemas import EventType, ActorType
 
 
-def pausar(segundos=1.0):
+def pausar(segundos=0.8):
     time.sleep(segundos)
 
 
@@ -53,7 +53,11 @@ def imprimir_titulo(texto):
 def main():
     imprimir_titulo("🛡️ AGENTBUYER: PROTOCOLO DE COMERCIO AGÉNTICO ZERO-TRUST")
     print("Iniciando demostración autónoma de punta a punta (sin intervención manual)...")
-    pausar(1.2)
+    pausar(1.0)
+
+    # Generamos llaves de Marta y del Agente
+    h_priv, h_pub = generate_keypair()
+    a_priv, a_pub = generate_keypair()
 
     # -------------------------------------------------------------------------
     # ACTO 1: EMISIÓN DEL MANDATO INTELIGENTE (PIEZA 2: IA + CRIPTOGRAFÍA + DLP)
@@ -61,12 +65,15 @@ def main():
     imprimir_titulo("ACTO 1 // PIEZA 2: HUMANO EMITE MANDATO EN LENGUAJE NATURAL")
     directiva_humana = "Cómprame un vuelo a Córdoba para el fin de semana, pero no me dejes sin presupuesto para cenar, usa tu juicio"
     print(f"🗣️  [HUMANO - MARTA]: \"{directiva_humana}\"")
-    pausar(1.0)
+    pausar(0.8)
 
     print("\n🤖  [AGENTE EMISOR IA]: Razonando directiva, deduciendo matices y prioridades...")
     mandato, estructura_ia = emitir_mandato_inteligente(
         directiva_humana=directiva_humana,
         presupuesto_referencia=500.0,
+        human_privkey=h_priv,
+        human_pubkey=h_pub,
+        agent_pubkey=a_pub,
     )
     mandate_store.save_mandate(mandato)
     
@@ -74,7 +81,7 @@ def main():
     print(f"    📋 Contrato Formal Deducido: Tope por compra: ${mandato.scope.max_amount_per_tx:.2f} USD | Presupuesto: ${mandato.scope.monthly_budget:.2f} USD")
     print(f"    🛡️  Garantía DLP: Scoped Virtual Token generado: {mandato.payment_token.token_id} ({mandato.payment_token.masked_card})")
     print(f"    🔐 Sello Criptográfico: Firma Ed25519 generada: {mandato.human_signature[:32]}...")
-    pausar(1.5)
+    pausar(1.0)
 
     # -------------------------------------------------------------------------
     # ACTO 2: COMPRA AUTÓNOMA LEGÍTIMA (VUELO LIMPIO $130)
@@ -83,9 +90,7 @@ def main():
     vuelo_130 = vuelaya_merchant.get_item("FLIGHT_COR_130")
     print(f"🔎  [AGENTE COMPRADOR]: Descubrió en VuelaYa: '{vuelo_130.title}' a ${vuelo_130.price:.2f} USD.")
     
-    a_priv, a_pub = generate_keypair()
     agente = PurchasingAgent("agent_marta", a_priv, a_pub)
-    
     attempt, result = agente.attempt_purchase(mandato, vuelo_130)
     print(f"    ✍️  Intento firmado con Nonce: {attempt.nonce[:16]}...")
     print(f"    🏪 [PASARELA DE VERIFICACIÓN]:")
@@ -95,7 +100,7 @@ def main():
     print(f"       • Estado Vivo:  ✅ ACTIVE")
     print(f"       • Límites AST:  ✅ ${vuelo_130.price:.2f} <= ${mandato.scope.max_amount_per_tx:.2f}")
     print(f"    🎉 Veredicto: {result.status.value} (Liquidación: {result.settlement_id})")
-    pausar(1.5)
+    pausar(1.0)
 
     # -------------------------------------------------------------------------
     # ACTO 3: AUDITORÍA COGNITIVA // LA TRAMPA DE LOS $145 (PIEZA 3)
@@ -103,7 +108,7 @@ def main():
     imprimir_titulo("ACTO 3 // PIEZA 3: AUDITOR COGNITIVO DETECTA TRAMPA DE LETRA CHICA")
     print("ℹ️  Contexto: Un comerciante publica un vuelo por $145 (pasa el filtro numérico de $150),")
     print("   pero la letra chica dice: 'Escala de 48 horas e incluye upgrade por $10 cobrados por fuera'.")
-    pausar(1.2)
+    pausar(0.8)
 
     print("\n🧠  [SEMANTIC FIREWALL]: Desplegando Cadena de Pensamiento (Chain of Thought)...")
     auditoria = auditoria_cognitiva_firewall(
@@ -120,7 +125,7 @@ def main():
     print(f"-------------------------------------------")
     print(f"🚫  Veredicto del Guardián: ❌ {auditoria.get('veredicto')} ({auditoria.get('resumen_para_humano')})")
     print("    COMPRA VETADA ANTES DE TOCAR EL DINERO.")
-    pausar(1.5)
+    pausar(1.0)
 
     # -------------------------------------------------------------------------
     # ACTO 4: LA PRUEBA DE FUEGO // LIVE REVOCATION KILL SWITCH
@@ -129,14 +134,14 @@ def main():
     print("🔴  [HUMANO / JUEZ]: Presiona el botón de REVOCACIÓN INMEDIATA en el Mandato.")
     mandate_store.revoke_mandate(mandato.mandate_id, reason="Prueba de Fuego ante los Jueces del Hackathon")
     print(f"    ⚡ Estado actualizado en la fuente autoritativa: REVOKED (< 1ms).")
-    pausar(1.0)
+    pausar(0.8)
 
     print("\n🤖  [AGENTE COMPRADOR]: Intenta comprar un vuelo legítimo ($130) un instante después...")
     attempt_post_rev, result_post_rev = agente.attempt_purchase(mandato, vuelo_130)
     print(f"    🛑 Resultado: ❌ {result_post_rev.status.value}")
     print(f"    Motivo: {result_post_rev.reason}")
     print("    ¡CORTE INSTANTÁNEO VERIFICADO CON ÉXITO!")
-    pausar(1.5)
+    pausar(1.0)
 
     # -------------------------------------------------------------------------
     # ACTO 5: TRIBUNAL MATEMÁTICO DE DISPUTAS Y AUDIT TRAIL (PIEZA 6)
@@ -150,12 +155,12 @@ def main():
         reason="Marta alega que el agente compró sin autorización."
     )
     print(f"    📜 Evidencia en Ledger: Transacción respaldada por bloque SHA-256 inmutable.")
-    print(f"    🔍 Veredicto Matemático: {disputa.liable_party}")
-    print(f"    Resolución: {disputa.resolution_notes}")
+    print(f"    🔍 Veredicto Matemático: Responsable = {disputa.liable_party}")
+    print(f"    Explicación: {disputa.explanation}")
     
     is_valid, msg = audit_ledger.verify_chain_integrity()
     print(f"    🔗 Integridad de la Cadena Merkle: {'✅ 100% VÁLIDA' if is_valid else '❌ CORRUPTA'} ({len(audit_ledger._entries)} bloques encadenados).")
-    pausar(1.0)
+    pausar(0.8)
 
     imprimir_titulo("🏆 DEMOSTRACIÓN ZERO-TOUCH CONCLUIDA CON ÉXITO")
     print("Todos los criterios cumplidos:")
