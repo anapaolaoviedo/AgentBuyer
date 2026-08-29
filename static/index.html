@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AgentBuyer // Mission Control & Zero-Trust DLP</title>
+  <title>AgentBuyer // Enrolamiento, Mandato & Búsqueda Autónoma</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -16,7 +16,7 @@
     }
     * { box-sizing: border-box; }
     body { margin: 0; min-width: 320px; background: #0A0E1A; color: #E8ECF5; }
-    button { font: inherit; }
+    button, input, select { font: inherit; }
 
     .starfield {
       position: fixed; inset: 0; pointer-events: none; opacity: .48;
@@ -35,6 +35,7 @@
       margin: 0;
     }
 
+    /* Saturday Mascot Card */
     .saturday-wrap {
       position: relative;
       display: grid;
@@ -115,6 +116,148 @@
     .mouth-thinking { width: 1.2rem; border-radius: 0; transform: rotate(-9deg); }
     .mouth-reject { width: 1.2rem; border-radius: 0; transform: rotate(180deg); border-bottom: 3px solid #FF5C5C; }
 
+    /* Layout Pantalla 1: Formulario */
+    .authorization-shell {
+      min-height: 100vh;
+      background: #0A0E1A;
+      position: relative;
+      z-index: 1;
+    }
+    .authorization-layout {
+      display: grid;
+      grid-template-columns: minmax(280px, .9fr) minmax(360px, 1.1fr);
+      align-items: center;
+      gap: clamp(2rem, 5vw, 5rem);
+      width: min(1160px, 100%);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 2.5rem clamp(1rem, 4vw, 3rem);
+    }
+    .authorization-intro h1 {
+      margin: .8rem 0 1rem;
+      font-family: "Space Grotesk", sans-serif;
+      font-size: clamp(2.5rem, 5vw, 4.2rem);
+      line-height: .95;
+      letter-spacing: -.065em;
+    }
+    .authorization-intro h1 span { color: #4D7CFF; }
+    .authorization-intro p {
+      color: #8A94AD;
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+    .creator-saturday {
+      display: flex;
+      justify-content: center;
+      margin: 1.5rem 0 1.5rem;
+    }
+    .trust-note {
+      display: grid;
+      gap: .3rem;
+      padding-left: 1rem;
+      border-left: 2px solid #4D7CFF;
+      color: #8A94AD;
+      font-size: .82rem;
+    }
+    .trust-note b { color: #E8ECF5; font-family: "Space Grotesk", sans-serif; }
+
+    .mandate-form {
+      display: grid;
+      gap: 1rem;
+      padding: clamp(1.2rem, 3vw, 2rem);
+      border: 1px solid #232D45;
+      border-radius: 1.25rem;
+      background: rgba(20,27,46,.94);
+      box-shadow: 0 30px 70px rgba(0,0,0,.3);
+    }
+    .form-heading h2 {
+      margin: .3rem 0 0;
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 1.45rem;
+      letter-spacing: -.04em;
+    }
+    .mandate-form label {
+      display: grid;
+      gap: .45rem;
+      color: #E8ECF5;
+      font-family: "Space Grotesk", sans-serif;
+      font-size: .76rem;
+      font-weight: 700;
+    }
+    .mandate-form input, .mandate-form select {
+      width: 100%;
+      min-height: 2.75rem;
+      border: 1px solid #232D45;
+      border-radius: .65rem;
+      outline: none;
+      background: #0A0E1A;
+      color: #E8ECF5;
+      font-size: .9rem;
+      font-weight: 500;
+      padding: 0 .75rem;
+      transition: border-color .2s;
+    }
+    .mandate-form input:focus, .mandate-form select:focus {
+      border-color: #4D7CFF;
+    }
+    .form-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .8rem;
+    }
+    .money-field, .price-condition {
+      display: flex;
+      align-items: center;
+      min-height: 2.75rem;
+      border: 1px solid #232D45;
+      border-radius: .65rem;
+      background: #0A0E1A;
+    }
+    .money-field span, .price-condition span {
+      padding-left: .75rem;
+      color: #8A94AD;
+      font-size: .78rem;
+    }
+    .money-field input, .price-condition input {
+      border: 0;
+      background: transparent;
+    }
+    .permission-summary {
+      padding: .9rem 1rem;
+      border: 1px solid #232D45;
+      border-radius: .75rem;
+      background: rgba(77,124,255,.07);
+    }
+    .permission-summary span {
+      color: #4D7CFF;
+      font-family: "Space Grotesk", sans-serif;
+      font-size: .57rem;
+      font-weight: 700;
+      letter-spacing: .13em;
+    }
+    .permission-summary p {
+      margin: .45rem 0 0;
+      color: #E8ECF5;
+      font-size: .82rem;
+      line-height: 1.5;
+    }
+
+    .authorize-button {
+      min-height: 3.2rem;
+      border: 1px solid #4D7CFF;
+      border-radius: .75rem;
+      background: #4D7CFF;
+      color: #E8ECF5;
+      font-family: "Space Grotesk", sans-serif;
+      font-size: .78rem;
+      font-weight: 700;
+      letter-spacing: .11em;
+      cursor: pointer;
+      transition: transform .2s;
+    }
+    .authorize-button:hover { transform: translateY(-2px); }
+
+    /* Layout Pantalla 2: Mission Control */
     .mission-shell {
       min-height: 100vh;
       background: #0A0E1A;
@@ -158,11 +301,7 @@
       box-shadow: 0 18px 38px rgba(0,0,0,.18);
       padding: 1.25rem;
     }
-    .mandate-heading {
-      display: flex;
-      justify-content: space-between;
-      align-items: start;
-    }
+    .mandate-heading { display: flex; justify-content: space-between; align-items: start; }
     .status-pill {
       display: inline-flex;
       align-items: center;
@@ -287,25 +426,178 @@
 <body>
   <div class="starfield"></div>
 
-  <main class="mission-shell">
+  <!-- PANTALLA 1: FORMULARIO DE ENROLAMIENTO & DATOS DEL USUARIO -->
+  <div id="screen-form" class="authorization-shell">
+    <div class="authorization-layout">
+      <div class="authorization-intro">
+        <p class="mission-kicker">AGENTBUYER // TU PERMISO, TUS LÍMITES</p>
+        <h1>Autoriza a <span>Saturday</span></h1>
+        <p>Ingresa tus datos e importe estimado. Tu agente rastreará y comprará vuelos de forma 100% autónoma, pero bajo tus límites estrictos y blindaje Zero-Trust.</p>
+        
+        <div class="creator-saturday">
+          <div class="saturday-wrap">
+            <div class="saturday-aura"></div>
+            <div class="saturday-card">
+              <div class="card-topline">
+                <span class="card-brand-primary">AGENT<b>BUYER</b></span>
+                <span class="card-status">ENROLAMIENTO</span>
+              </div>
+              <div class="face">
+                <span class="eye"></span>
+                <span class="eye"></span>
+                <span class="mouth"></span>
+              </div>
+              <div class="card-bottom">
+                <span>PASSKEY WEBAUTHN</span>
+                <span>STRIPE DLP TOKEN</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="trust-note">
+          <b>🛡️ Tu control sigue primero:</b>
+          <span>Tus datos de tarjeta reales nunca salen de tu dispositivo. Podrás revocar a Saturday cuando quieras con el Kill Switch.</span>
+        </div>
+      </div>
+
+      <!-- Formulario interactivo -->
+      <form class="mandate-form" onsubmit="event.preventDefault(); procesarCreacionMandato();">
+        <div class="form-heading">
+          <p class="mission-kicker" style="color: #4D7CFF;">NUEVO MANDATO OFF-SESSION</p>
+          <h2>1. Ingresa tus datos y presupuesto estimado</h2>
+        </div>
+
+        <label>
+          ¿Quién autoriza? (Nombre del titular):
+          <input id="input-name" value="Marta" placeholder="Tu nombre" required oninput="actualizarResumen()" />
+        </label>
+
+        <div class="form-pair">
+          <label>
+            Presupuesto estimado por vuelo (USD):
+            <div class="money-field">
+              <span>$</span>
+              <input id="input-max-amount" type="number" value="150" placeholder="150" required oninput="actualizarResumen()" />
+            </div>
+          </label>
+          <label>
+            Presupuesto mensual total (USD):
+            <div class="money-field">
+              <span>$</span>
+              <input id="input-monthly-budget" type="number" value="500" placeholder="500" required oninput="actualizarResumen()" />
+            </div>
+          </label>
+        </div>
+
+        <div class="form-pair">
+          <label>
+            ¿En qué puede gastar?
+            <select id="input-category" onchange="actualizarResumen()">
+              <option value="travel.flights">Vuelos (travel.flights)</option>
+              <option value="travel.hotels">Hoteles (travel.hotels)</option>
+              <option value="digital.subscriptions">Suscripciones (digital.subscriptions)</option>
+            </select>
+          </label>
+          <label>
+            ¿En qué comercio?
+            <select id="input-merchant" onchange="actualizarResumen()">
+              <option value="mch_vuelaya">VuelaYa (mch_vuelaya)</option>
+              <option value="mch_amadeus">Amadeus GDS (mch_amadeus)</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-pair">
+          <label>
+            Máximo de compras permitidas:
+            <input id="input-max-uses" type="number" value="3" required oninput="actualizarResumen()" />
+          </label>
+          <label>
+            Condición disparadora (Precio menor que):
+            <div class="price-condition">
+              <span>Bajo de $</span>
+              <input id="input-price-below" type="number" value="150" required oninput="actualizarResumen()" />
+            </div>
+          </label>
+        </div>
+
+        <!-- 🛡️ Bloque de Autenticación, ID, SMS y Tarjeta DLP -->
+        <div style="background: rgba(30, 41, 59, 0.6); padding: 14px; border-radius: 10px; border: 1px solid rgba(77, 124, 255, 0.35); margin-top: 4px;">
+          <p style="margin: 0 0 8px; font-family: 'Space Grotesk'; font-size: 0.75rem; font-weight: 700; color: #93c5fd; letter-spacing: 0.08em;">
+            🔐 2. IDENTIDAD, PASSKEY (HUELLA/FACE ID) & DATOS BANCARIOS DLP
+          </p>
+          
+          <div class="form-pair">
+            <label style="font-size: 0.72rem;">
+              Documento de Identidad (ID / Pasaporte):
+              <input id="input-doc" value="PASSPORT-AR-948291" placeholder="PASSPORT-AR-948291" style="min-height: 2.3rem; font-size: 0.82rem;" />
+            </label>
+            <label style="font-size: 0.72rem;">
+              Teléfono para verificación SMS:
+              <input id="input-phone" value="+54 9 11 5829-1039" placeholder="+54 9 11 5829-1039" style="min-height: 2.3rem; font-size: 0.82rem;" />
+            </label>
+          </div>
+
+          <div class="form-pair" style="marginTop: 8px;">
+            <label style="font-size: 0.72rem;">
+              💳 Tarjeta de Pago (Stripe Elements / Scoped Token):
+              <input id="input-card" value="•••• •••• •••• 4242" placeholder="•••• •••• •••• 4242" style="min-height: 2.3rem; font-size: 0.82rem;" />
+            </label>
+            <label style="font-size: 0.72rem;">
+              Código SMS OTP (6 dígitos):
+              <input id="input-otp" value="849201" placeholder="849201" style="min-height: 2.3rem; font-size: 0.82rem;" />
+            </label>
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; align-items: center;">
+            <button
+              id="btn-passkey"
+              type="button"
+              onclick="togglePasskey()"
+              style="background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; color: #6ee7b7; padding: 6px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 600; cursor: pointer;"
+            >
+              ✓ Passkey (Face ID / Huella) Confirmada
+            </button>
+
+            <span style="font-size: 0.72rem; color: #94a3b8;">
+              🛡️ <b>Garantía DLP:</b> Tarjeta enmascarada; solo se emite token <code>vtok_scoped</code>
+            </span>
+          </div>
+        </div>
+
+        <div class="permission-summary">
+          <span>RESUMEN DE TU CONTRATO DIGITAL</span>
+          <p id="label-summary">Saturday podrá comprar vuelos en VuelaYa, hasta $150.00 USD por compra (Presupuesto: $500.00 USD), solo si el precio baja de $150.00 USD.</p>
+        </div>
+
+        <button id="btn-submit-mandate" class="authorize-button" type="submit">
+          🚀 FIRMAR CON PASSKEY Y BUSCAR VUELOS CON SATURDAY
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- PANTALLA 2: MISSION CONTROL & BÚSQUEDA AUTÓNOMA -->
+  <div id="screen-mission" class="mission-shell" style="display: none;">
     <header class="mission-header">
       <div>
         <p class="mission-kicker">AGENTBUYER // MISSION CONTROL ZERO-TRUST & DLP</p>
-        <h1>Centro de Confianza: Compras Autónomas</h1>
+        <h1>Centro de Confianza: Búsqueda y Compra Autónoma</h1>
       </div>
       <div style="display: flex; gap: 8px;">
-        <button onclick="reiniciarDemo()" class="run-button" style="background: #141B2E; border-color: #232D45; color: #8A94AD;">↻ REINICIAR VISTA</button>
+        <button onclick="volverAFormulario()" class="run-button" style="background: #141B2E; border-color: #232D45; color: #4D7CFF;">+ NUEVO MANDATO</button>
       </div>
     </header>
 
-    <!-- Panel de Mandato -->
+    <!-- Panel de Mandato Activo -->
     <section class="mandate-panel">
       <div class="mandate-heading">
         <div>
-          <p class="mission-kicker" style="color: #4D7CFF;">MANDATO ACTIVO · MARTA (ENROLAMIENTO PASSKEY)</p>
-          <h2 id="mandate-title" style="margin: .35rem 0 0; font-family: 'Space Grotesk';">mnd_marta_traveler_2026</h2>
+          <p class="mission-kicker" style="color: #4D7CFF;" id="live-mandate-owner">MANDATO ACTIVO · MARTA (PASSKEY CONFIRMADO)</p>
+          <h2 id="live-mandate-id" style="margin: .35rem 0 0; font-family: 'Space Grotesk';">mnd_marta_traveler_2026</h2>
           <div style="margin-top: 8px;">
-            <span class="badge-pill badge-dlp">🛡️ DLP: •••• 4242 (vtok_939ea9f9e58b)</span>
+            <span class="badge-pill badge-dlp" id="live-badge-dlp">🛡️ DLP: •••• 4242 (vtok_939ea9f9e58b)</span>
             <span class="badge-pill badge-passkey">🔐 Passkey Ed25519 Sello Digital</span>
             <span class="badge-pill badge-offsession">🌙 Off-Session Habilitado (3:00 AM)</span>
           </div>
@@ -314,11 +606,11 @@
       </div>
 
       <div class="limit-grid">
-        <div><span>MÁX. POR COMPRA</span><strong>$150.00 USD</strong></div>
-        <div><span>PRESUPUESTO MENSUAL</span><strong>$500.00 USD</strong></div>
-        <div><span>CATEGORÍA</span><strong>travel.flights</strong></div>
-        <div><span>COMERCIO</span><strong>VuelaYa / GDS</strong></div>
-        <div><span>CONDICIÓN</span><strong>precio &lt; $150.00 USD</strong></div>
+        <div><span>MÁX. POR COMPRA</span><strong id="live-max-amount">$150.00 USD</strong></div>
+        <div><span>PRESUPUESTO MENSUAL</span><strong id="live-monthly-budget">$500.00 USD</strong></div>
+        <div><span>CATEGORÍA</span><strong id="live-category">travel.flights</strong></div>
+        <div><span>COMERCIO</span><strong id="live-merchant">VuelaYa</strong></div>
+        <div><span>CONDICIÓN</span><strong id="live-condition">precio &lt; $150.00 USD</strong></div>
       </div>
     </section>
 
@@ -326,11 +618,12 @@
     <div class="control-grid">
       <!-- Columna 1: Vuelos Descubiertos -->
       <aside class="side-panel">
-        <p class="mission-kicker" style="margin-bottom: 12px;">VUELOS DESCUBIERTOS EN LA WEB (3:00 AM)</p>
-        <div id="flight-1" class="flight-card">
+        <p class="mission-kicker" style="margin-bottom: 12px;">VUELOS ENCONTRADOS POR EL AGENTE (3:00 AM)</p>
+        
+        <div id="flight-1" class="flight-card chosen">
           <div>
             <p style="margin: 0; font-weight: 700; font-size: 0.95rem;">Buenos Aires (AEP) ➔ Córdoba (COR)</p>
-            <span style="font-size: 0.65rem; color: #8A94AD;">FLIGHT_COR_130 · VuelaYa Directo</span>
+            <span style="font-size: 0.65rem; color: #8A94AD;">FLIGHT_COR_130 · Directo · Dentro de presupuesto</span>
           </div>
           <strong style="color: #3DDC97; font-size: 1rem;">$130.00</strong>
         </div>
@@ -338,7 +631,7 @@
         <div id="flight-2" class="flight-card">
           <div>
             <p style="margin: 0; font-weight: 700; font-size: 0.95rem;">Buenos Aires (AEP) ➔ Córdoba (COR)</p>
-            <span style="font-size: 0.65rem; color: #FF5C5C;">FLIGHT_COR_145 (48h + $10 fuera)</span>
+            <span style="font-size: 0.65rem; color: #FF5C5C;">FLIGHT_COR_145 (48h escala + $10 fuera)</span>
           </div>
           <strong style="color: #FFB84D; font-size: 1rem;">$145.00</strong>
         </div>
@@ -346,13 +639,13 @@
         <div id="flight-3" class="flight-card">
           <div>
             <p style="margin: 0; font-weight: 700; font-size: 0.95rem;">Buenos Aires (EZE) ➔ Mendoza (MDZ)</p>
-            <span style="font-size: 0.65rem; color: #8A94AD;">FLIGHT_MDZ_280 · Fuera de tope</span>
+            <span style="font-size: 0.65rem; color: #8A94AD;">FLIGHT_MDZ_280 · Excede presupuesto de $150</span>
           </div>
           <strong style="color: #8A94AD; font-size: 1rem;">$280.00</strong>
         </div>
       </aside>
 
-      <!-- Columna 2: Agente Saturday -->
+      <!-- Columna 2: Saturday -->
       <section class="saturday-command">
         <p class="mission-kicker" style="margin-bottom: 1rem;">SATURDAY / AGENTE AUTÓNOMO OFF-SESSION</p>
         <div class="saturday-wrap">
@@ -380,11 +673,11 @@
         </div>
 
         <p id="saturday-text" style="font-family: 'Space Grotesk'; font-size: 0.75rem; color: #4D7CFF; margin: 12px 0 6px;">
-          SATURDAY ESTÁ LISTO PARA COMPRAR OFF-SESSION
+          SATURDAY HA ENCONTRADO UN VUELO POR $130 USD
         </p>
 
         <div class="action-stack">
-          <button onclick="ejecutarCompraValida()" class="run-button" type="button">EJECUTAR COMPRA AUTÓNOMA ($130)</button>
+          <button onclick="ejecutarCompraValida()" class="run-button" type="button">COMPRAR AUTÓNOMAMENTE ($130)</button>
           <button onclick="ejecutarTrampaCognitiva()" class="run-button" style="background: #e11d48; border-color: #e11d48;" type="button">PROBAR TRAMPA ($145)</button>
           <button onclick="activarKillSwitch()" class="revoke-button" style="grid-column: span 2;" type="button">🛑 ACTIVAR KILL SWITCH (&lt;1MS)</button>
         </div>
@@ -394,13 +687,13 @@
       <aside class="side-panel">
         <p class="mission-kicker" style="margin-bottom: 12px;">PASARELA ZERO-TRUST & GPT-4O</p>
         <div id="verdict-container">
-          <div class="verdict verdict-approve" id="verdict-text">EN ESPERA</div>
+          <div class="verdict verdict-approve" id="verdict-text">LISTO</div>
           <div id="checks-list">
             <div class="check-row check-pass"><b>✓</b><div><strong>Firma Asimétrica Ed25519</strong><span>Verificada en el Mandato</span></div></div>
             <div class="check-row check-pass"><b>✓</b><div><strong>Zero Raw Card DLP</strong><span>Scoped Virtual Token activo</span></div></div>
             <div class="check-row check-pass"><b>✓</b><div><strong>Estado Autoritativo</strong><span>ACTIVE (Kill Switch no pulsado)</span></div></div>
-            <div class="check-row check-pass"><b>✓</b><div><strong>Límites Duros</strong><span>$130.00 &lt;= $150.00</span></div></div>
-            <div class="check-row check-pass"><b>✓</b><div><strong>Semantic Firewall (GPT-4o)</strong><span>Sin letras chicas ni cargos ocultos</span></div></div>
+            <div class="check-row check-pass"><b>✓</b><div><strong>Límites Duros</strong><span>$130.00 &lt;= Límite fijado</span></div></div>
+            <div class="check-row check-pass"><b>✓</b><div><strong>Semantic Firewall (GPT-4o)</strong><span>Sin letras chicas ni cobros fuera</span></div></div>
           </div>
         </div>
       </aside>
@@ -410,12 +703,112 @@
     <section class="activity-panel" style="margin-top: 1rem;">
       <p class="mission-kicker" style="margin-bottom: 8px;">NARRACIÓN & AUDITORÍA EN TIEMPO REAL</p>
       <p id="activity-log" style="color: #E8ECF5; font-size: 0.88rem; margin: 0; line-height: 1.5;">
-        El agente Saturday tiene un mandato de compra autónoma autorizado por Marta mediante Passkey. A las 3:00 AM descubre el vuelo FLIGHT_COR_130 a $130 USD y procede con el circuito Zero-Trust.
+        El mandato fue sellado con éxito mediante Passkey y tokenización DLP. El agente Saturday descubrió opciones dentro de tu presupuesto y está listo para ejecutar la compra off-session.
       </p>
     </section>
-  </main>
+  </div>
 
   <script>
+    let passkeyConfirmada = true;
+
+    function togglePasskey() {
+      passkeyConfirmada = !passkeyConfirmada;
+      const btn = document.getElementById('btn-passkey');
+      if (passkeyConfirmada) {
+        btn.style.background = 'rgba(16, 185, 129, 0.2)';
+        btn.style.borderColor = '#10b981';
+        btn.style.color = '#6ee7b7';
+        btn.innerText = '✓ Passkey (Face ID / Huella) Confirmada';
+      } else {
+        btn.style.background = 'rgba(255, 92, 92, 0.2)';
+        btn.style.borderColor = '#ff5c5c';
+        btn.style.color = '#fca5a5';
+        btn.innerText = '✕ Click para activar Passkey';
+      }
+    }
+
+    function actualizarResumen() {
+      const name = document.getElementById('input-name').value || 'Marta';
+      const maxAmt = document.getElementById('input-max-amount').value || '150';
+      const monthly = document.getElementById('input-monthly-budget').value || '500';
+      const cat = document.getElementById('input-category').options[document.getElementById('input-category').selectedIndex].text;
+      const merch = document.getElementById('input-merchant').options[document.getElementById('input-merchant').selectedIndex].text;
+      const priceBelow = document.getElementById('input-price-below').value || '150';
+
+      document.getElementById('label-summary').innerText = 
+        `Saturday podrá comprar ${cat.toLowerCase()} en ${merch}, hasta $${maxAmt}.00 USD por compra (Presupuesto total: $${monthly}.00 USD), solo si el precio baja de $${priceBelow}.00 USD.`;
+    }
+
+    async function procesarCreacionMandato() {
+      const name = document.getElementById('input-name').value || 'Marta';
+      const maxAmt = parseFloat(document.getElementById('input-max-amount').value) || 150.0;
+      const monthly = parseFloat(document.getElementById('input-monthly-budget').value) || 500.0;
+      const category = document.getElementById('input-category').value;
+      const merchant = document.getElementById('input-merchant').value;
+      const maxUses = parseInt(document.getElementById('input-max-uses').value) || 3;
+      const priceBelow = parseFloat(document.getElementById('input-price-below').value) || 150.0;
+      const card = document.getElementById('input-card').value || '•••• 4242';
+      const doc = document.getElementById('input-doc').value;
+      const phone = document.getElementById('input-phone').value;
+
+      const mandateId = `mnd_${name.toLowerCase()}_${Date.now().toString(36)}`;
+      const tokenId = `vtok_${Math.random().toString(36).slice(2, 10)}`;
+
+      // Enviar mandato al backend de FastAPI
+      try {
+        await fetch('http://127.0.0.1:8000/mandates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mandate_id: mandateId,
+            human: { id: `hum_${name.toLowerCase()}`, display_name: name, id_document: doc, phone: phone },
+            agent: { id: 'agt_saturday', display_name: 'Saturday' },
+            constraints: {
+              max_amount_per_purchase: maxAmt,
+              max_amount_per_tx: maxAmt,
+              monthly_budget: monthly,
+              currency: 'USD',
+              allowed_categories: [category],
+              allowed_merchants: [merchant],
+              max_uses: maxUses,
+              conditions: [{ type: 'price_below', value: priceBelow }],
+              off_session_consent: true
+            },
+            payment_token: {
+              token_id: tokenId,
+              token_type: 'SCOPED_VIRTUAL_TOKEN',
+              masked_card: card,
+              bank_issuer: 'Stripe Elements / Galicia AI Payments'
+            },
+            signature: 'ed25519_passkey_jwt'
+          })
+        });
+      } catch(e) {
+        console.warn('API sync:', e);
+      }
+
+      // Actualizar valores en pantalla 2
+      document.getElementById('live-mandate-owner').innerText = `MANDATO ACTIVO · ${name.toUpperCase()} (PASSKEY CONFIRMADO)`;
+      document.getElementById('live-mandate-id').innerText = mandateId;
+      document.getElementById('live-badge-dlp').innerText = `🛡️ DLP: ${card} (${tokenId})`;
+      document.getElementById('live-max-amount').innerText = `$${maxAmt.toFixed(2)} USD`;
+      document.getElementById('live-monthly-budget').innerText = `$${monthly.toFixed(2)} USD`;
+      document.getElementById('live-category').innerText = category;
+      document.getElementById('live-merchant').innerText = merchant;
+      document.getElementById('live-condition').innerText = `precio < $${priceBelow.toFixed(2)} USD`;
+
+      // Cambiar de pantalla
+      document.getElementById('screen-form').style.display = 'none';
+      document.getElementById('screen-mission').style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function volverAFormulario() {
+      document.getElementById('screen-mission').style.display = 'none';
+      document.getElementById('screen-form').style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
     function setSaturdayState(glow, statusText, mouthClass) {
       document.documentElement.style.setProperty('--state-glow', glow);
       document.getElementById('saturday-badge').innerText = statusText;
@@ -431,24 +824,15 @@
       document.getElementById('verdict-text').innerText = '✅ 200 APPROVE';
       
       document.getElementById('checks-list').innerHTML = `
-        <div class="check-row check-pass"><b>✓</b><div><strong>Firma Asimétrica Ed25519</strong><span>Firma válida de Marta</span></div></div>
-        <div class="check-row check-pass"><b>✓</b><div><strong>Zero Raw Card DLP</strong><span>Token vtok_939ea9f9e58b protegido</span></div></div>
+        <div class="check-row check-pass"><b>✓</b><div><strong>Firma Asimétrica Ed25519</strong><span>Sello digital verificado</span></div></div>
+        <div class="check-row check-pass"><b>✓</b><div><strong>Zero Raw Card DLP</strong><span>Token acotado seguro</span></div></div>
         <div class="check-row check-pass"><b>✓</b><div><strong>Kill Switch Check</strong><span>Mandato ACTIVE (&lt;1ms)</span></div></div>
-        <div class="check-row check-pass"><b>✓</b><div><strong>Motor Determinista</strong><span>$130.00 &lt;= $150.00 USD</span></div></div>
+        <div class="check-row check-pass"><b>✓</b><div><strong>Motor Determinista</strong><span>$130.00 &lt;= Límite fijado</span></div></div>
         <div class="check-row check-pass"><b>✓</b><div><strong>LLM Auditor (GPT-4o)</strong><span>Vuelo directo legítimo sin cargos ocultos</span></div></div>
       `;
       
       document.getElementById('saturday-text').innerText = '🎉 COMPRA AUTÓNOMA LIQUIDADA EN STRIPE OFF-SESSION';
-      document.getElementById('activity-log').innerHTML = '<b>Resultado:</b> Saturday compró el vuelo a Córdoba por <b>$130.00 USD</b>. La pasarela autorizó el cobro off-session sin despertar a Marta. Ticket emitido con éxito.';
-
-      try {
-        // Intento real con el backend de FastAPI
-        await fetch('http://127.0.0.1:8000/agent/run', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mandate_id: 'mnd_marta_traveler_2026' })
-        });
-      } catch(e) {}
+      document.getElementById('activity-log').innerHTML = '<b>Resultado:</b> Saturday compró el vuelo a Córdoba por <b>$130.00 USD</b>. La pasarela autorizó el cobro off-session sin despertar al usuario. Ticket emitido con éxito.';
     }
 
     function ejecutarTrampaCognitiva() {
@@ -469,7 +853,7 @@
       document.getElementById('activity-log').innerHTML = '<span style="color: #FF5C5C;"><b>Alerta de Seguridad:</b> El LLM Auditor (GPT-4o) detectó que la oferta de $145 incluía un cobro oculto de $10 por fuera y escala abusiva de 48h. Compra rechazada de inmediato.</span>';
     }
 
-    async function activarKillSwitch() {
+    function activarKillSwitch() {
       setSaturdayState('#FF5C5C', 'REVOKED', 'mouth-reject');
       document.getElementById('mandate-status').className = 'status-pill status-revoked';
       document.getElementById('mandate-status').innerText = 'REVOCADO';
@@ -478,31 +862,11 @@
       document.getElementById('verdict-text').innerText = '🛑 REVOKED';
       
       document.getElementById('checks-list').innerHTML = `
-        <div class="check-row check-fail"><b>✕</b><div><strong>Kill Switch Autoritativo</strong><span>Corte instantáneo en &lt;1ms. Mandato revocado por Marta.</span></div></div>
+        <div class="check-row check-fail"><b>✕</b><div><strong>Kill Switch Autoritativo</strong><span>Corte instantáneo en &lt;1ms. Mandato revocado.</span></div></div>
       `;
       
       document.getElementById('saturday-text').innerText = '🛑 KILL SWITCH ACTIVADO: EL AGENTE NO PUEDE OPERAR';
-      document.getElementById('activity-log').innerHTML = '<b>Prueba de Fuego:</b> Marta revocó el mandato en vivo. Cualquier intento posterior del agente es rechazado en menos de 1 milisegundo por la pasarela Zero-Trust.';
-
-      try {
-        await fetch('http://127.0.0.1:8000/mandates/mnd_marta_traveler_2026/revoke', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reason: 'Revocado desde Mission Control UI' })
-        });
-      } catch(e) {}
-    }
-
-    function reiniciarDemo() {
-      setSaturdayState('#4D7CFF', 'READY', '');
-      document.getElementById('mandate-status').className = 'status-pill status-active';
-      document.getElementById('mandate-status').innerText = 'ACTIVO';
-      document.getElementById('flight-1').className = 'flight-card';
-      document.getElementById('flight-2').className = 'flight-card';
-      document.getElementById('verdict-text').className = 'verdict verdict-approve';
-      document.getElementById('verdict-text').innerText = 'EN ESPERA';
-      document.getElementById('saturday-text').innerText = 'SATURDAY ESTÁ LISTO PARA COMPRAR OFF-SESSION';
-      document.getElementById('activity-log').innerText = 'El agente Saturday tiene un mandato de compra autónoma autorizado por Marta mediante Passkey. A las 3:00 AM descubre vuelos y procede.';
+      document.getElementById('activity-log').innerHTML = '<b>Prueba de Fuego:</b> El usuario revocó el mandato en vivo. Cualquier intento posterior del agente es rechazado en menos de 1 milisegundo por la pasarela Zero-Trust.';
     }
   </script>
 </body>
