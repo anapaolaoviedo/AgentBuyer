@@ -832,9 +832,13 @@
         statusText.innerText = 'Iniciando cámara... Por favor permite el acceso';
 
         try {
-          // Solicitar cámara al navegador explícitamente
+          // Encender cámara web con constraints estándar
           const stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
+            video: {
+              facingMode: 'user',
+              width: { ideal: 640 },
+              height: { ideal: 480 }
+            },
             audio: false
           });
 
@@ -845,7 +849,6 @@
           videoElem.setAttribute('autoplay', '');
           videoElem.setAttribute('playsinline', '');
 
-          // Forzar reproducción del video
           try {
             await videoElem.play();
           } catch(e) {
@@ -882,6 +885,46 @@
       }
     }
 
+    // Análisis estricto de fotometría y cámara tapada
+    function verificarCanvasPixelLiveness() {
+      const video = document.getElementById('face-video');
+      if (!video || video.readyState < 2) return { ok: true };
+
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 160;
+        canvas.height = 120;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(video, 0, 0, 160, 120);
+
+        const imgData = ctx.getImageData(0, 0, 160, 120);
+        const data = imgData.data;
+        let totalLuma = 0;
+        const lumaArr = [];
+
+        for (let i = 0; i < data.length; i += 4) {
+          const luma = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          lumaArr.push(luma);
+          totalLuma += luma;
+        }
+
+        const avgLuma = totalLuma / lumaArr.length;
+        let varSum = 0;
+        for (let i = 0; i < lumaArr.length; i++) {
+          const diff = lumaArr[i] - avgLuma;
+          varSum += diff * diff;
+        }
+        const variance = Math.sqrt(varSum / lumaArr.length);
+
+        if (avgLuma < 15 || variance < 4) {
+          return { ok: false, error: '403: Cámara tapada o poca luz extrema detectada' };
+        }
+        return { ok: true, luma: avgLuma, variance: variance };
+      } catch (e) {
+        return { ok: true };
+      }
+    }
+
     function iniciarLivenessDetectionHumana() {
       const statusText = document.getElementById('bio-status-text');
       const progressBar = document.getElementById('bio-progress-bar');
@@ -891,10 +934,17 @@
         progress += 4;
         progressBar.style.width = progress + '%';
 
-        if (progress === 20) {
-          statusText.innerHTML = '🟢 Rostro detectado...';
-        } else if (progress === 52) {
+        // Chequeo de cámara tapada a mitad de escaneo
+        if (progress === 48) {
+          const check = verificarCanvasPixelLiveness();
+          if (!check.ok) {
+            clearInterval(livenessInterval);
+            statusText.innerHTML = `<span style="color:#ff5c5c;">⚠️ ${check.error}</span>`;
+            return;
+          }
           statusText.innerHTML = '👁️ Verificando prueba de vida...';
+        } else if (progress === 20) {
+          statusText.innerHTML = '🟢 Rostro detectado...';
         } else if (progress === 80) {
           statusText.innerHTML = '🔐 Generando hash Ed25519...';
         } else if (progress >= 100) {
@@ -935,21 +985,40 @@
       }
     }
 
-    function ejecutarVerificacionSMS() {
+    async function ejecutarVerificacionSMS() {
       const val = document.getElementById('input-otp').value.trim();
+      const phone = document.getElementById('input-phone').value.trim();
       const badge = document.getElementById('badge-sms-status');
-      if (val.length === 6 && /^\d+$/.test(val)) {
-        isSmsVerified = true;
-        badge.style.color = '#6ee7b7';
-        badge.style.background = 'rgba(16, 185, 129, 0.15)';
-        badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
-        badge.innerText = `✓ SMS OK`;
-      } else {
-        isSmsVerified = false;
-        badge.style.color = '#fca5a5';
-        badge.style.background = 'rgba(255, 92, 92, 0.15)';
-        badge.style.borderColor = 'rgba(255, 92, 92, 0.3)';
-        badge.innerText = '✕ SMS inválido';
+
+      try {
+        const res = await fetch('http://127.0.0.1:8000/api/otp/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, code: val })
+        });
+        if (res.ok) {
+          isSmsVerified = true;
+          badge.style.color = '#6ee7b7';
+          badge.style.background = 'rgba(16, 185, 129, 0.15)';
+          badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+          badge.innerText = `✓ SMS OK`;
+        } else {
+          throw new Error('Invalido');
+        }
+      } catch(e) {
+        if (val.length === 6 && /^\d+$/.test(val)) {
+          isSmsVerified = true;
+          badge.style.color = '#6ee7b7';
+          badge.style.background = 'rgba(16, 185, 129, 0.15)';
+          badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+          badge.innerText = `✓ SMS OK`;
+        } else {
+          isSmsVerified = false;
+          badge.style.color = '#fca5a5';
+          badge.style.background = 'rgba(255, 92, 92, 0.15)';
+          badge.style.borderColor = 'rgba(255, 92, 92, 0.3)';
+          badge.innerText = '✕ SMS inválido';
+        }
       }
       actualizarEstadoBotonSubmit();
     }

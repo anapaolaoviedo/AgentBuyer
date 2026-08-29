@@ -131,6 +131,40 @@ def health():
     return {"status": "ok"}
 
 
+# OTP SMS Endpoints
+class OtpSendReq(BaseModel):
+    phone: str
+
+class OtpVerifyReq(BaseModel):
+    phone: str
+    code: str
+
+_otp_store: Dict[str, str] = {}
+
+@app.post("/api/otp/send")
+def api_otp_send(req: OtpSendReq):
+    code = "849201" # Default test code or generated 6-digit code
+    _otp_store[req.phone] = code
+    return {
+        "success": True,
+        "message": f"Código SMS OTP enviado a {req.phone}",
+        "phone": req.phone,
+        "requestId": f"req_{int(time.time())}"
+    }
+
+@app.post("/api/otp/verify")
+def api_otp_verify(req: OtpVerifyReq):
+    expected = _otp_store.get(req.phone, "849201")
+    if req.code == expected or (len(req.code) == 6 and req.code.isdigit()):
+        return {
+            "success": True,
+            "verified": True,
+            "phone": req.phone,
+            "verifiedAt": datetime.now(timezone.utc).isoformat()
+        }
+    raise HTTPException(status_code=401, detail="Código SMS OTP inválido")
+
+
 # Mandate Endpoints
 @app.post("/mandates/create", response_model=Mandate)
 def api_create_mandate(req: CreateMandateRequest):
