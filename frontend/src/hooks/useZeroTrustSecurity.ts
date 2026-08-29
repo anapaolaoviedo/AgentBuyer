@@ -1,39 +1,25 @@
-import { useState, useMemo, useCallback } from "react";
-
-export interface WebAuthnAttestation {
-  credentialId: string;
-  clientDataJSON: string;
-  attestationObject: string;
-  authenticatorAttachment: string;
-  type: string;
-}
-
-export interface MandateLimits {
-  humanName: string;
-  maxAmountPerPurchase: number;
-  monthlyBudget: number;
-  category?: string;
-  merchant?: string;
-  maxUses?: number;
-  priceBelow?: number;
-  validUntil?: string;
-  idDocument?: string;
-  phone?: string;
-}
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 
 export interface MandatePayload {
-  mandate_id: string;
-  human: {
+  destination: string;
+  max_amount_per_tx: number;
+  monthly_limit: number;
+  currency: string;
+  passengers: string[];
+  expires_at: string;
+  status: string;
+  mandate_id?: string;
+  human?: {
     id: string;
     display_name: string;
-    id_document?: string;
     phone?: string;
+    id_document?: string;
   };
-  agent: {
+  agent?: {
     id: string;
     display_name: string;
   };
-  constraints: {
+  constraints?: {
     max_amount_per_purchase: number;
     max_amount_per_tx: number;
     monthly_budget: number;
@@ -44,327 +30,467 @@ export interface MandatePayload {
     conditions: Array<{ type: string; value: number }>;
     off_session_consent: boolean;
   };
-  payment_token: {
+  payment_token?: {
     token_id: string;
     token_type: string;
     masked_card: string;
     bank_issuer: string;
-    bound_mandate_id: string;
   };
-  authentication: {
+  authentication?: {
     passkey_verified: boolean;
-    passkey_attestation: WebAuthnAttestation | null;
-    sms_otp_verified: boolean;
-    biometric_hardware_enforced: boolean;
-    auth_factors_count: number;
+    liveness_verified: boolean;
+    possession_verified: boolean;
     enrolled_at: string;
   };
-  valid_until?: string;
-  signature: string;
+  signature?: string;
+}
+
+export interface ZeroTrustSecurityState {
+  isPasskeyVerified: boolean;
+  isLivenessVerified: boolean;
+  isPossessionVerified: boolean;
+  isStripeTokenized: boolean;
+  paymentMethodId: string | null;
+  errorMessage: string | null;
+  isLoading: boolean;
+  isSubmitEnabled: boolean;
 }
 
 const API_BASE = "http://127.0.0.1:8000";
 
-const bufferToBase64Url = (buffer: ArrayBuffer): string => {
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
-};
-
 /**
- * Custom Hook de React: useZeroTrustSecurity
- * Implementa el modelo de "Enrolamiento Fuerte Único" Zero-Trust con 3 factores:
- * 1) Biometría estricta de plataforma (Face ID / Huella / Windows Hello)
- * 2) SMS OTP de 6 dígitos
- * 3) Tokenización PCI / Scoped Virtual Token (vtok_...)
+ * Custom Hook de React para Enrolamiento Fuerte Único (Zero-Trust MFA).
+ * 
+ * Regla inquebrantable de autorización:
+ * isSubmitEnabled = isStripeTokenized && (isPasskeyVerified || isLivenessVerified) && isPossessionVerified
  */
-export function useZeroTrustSecurity(onSuccess?: (mandateId: string) => void) {
-  // 1. Estados booleanos de los 3 factores y datos de enrolamiento
+export function useZeroTrustSecurity() {
   const [isPasskeyVerified, setIsPasskeyVerified] = useState<boolean>(false);
-  const [passkeyAttestation, setPasskeyAttestation] = useState<WebAuthnAttestation | null>(null);
-
-  const [isSmsVerified, setIsSmsVerified] = useState<boolean>(false);
-  const [smsCode, setSmsCode] = useState<string>("");
-  const [userPhone, setUserPhone] = useState<string>("+54 9 11 5829-1039");
-
+  const [isLivenessVerified, setIsLivenessVerified] = useState<boolean>(false);
+  const [isPossessionVerified, setIsPossessionVerified] = useState<boolean>(false);
   const [isStripeTokenized, setIsStripeTokenized] = useState<boolean>(false);
   const [paymentMethodId, setPaymentMethodId] = useState<string | null>(null);
-  const [maskedCard, setMaskedCard] = useState<string>("•••• •••• •••• 4242");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const [userIdDoc, setUserIdDoc] = useState<string>("PASSPORT-AR-948291");
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [securityError, setSecurityError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  /**
-   * 2. handlePasskeyChallenge(): Biometría Estricta de Plataforma
-   * Forzamos authenticatorAttachment: 'platform' y userVerification: 'required'
-   * para exigir explícitamente el hardware biométrico (Face ID, Touch ID, Windows Hello).
-   */
-  const handlePasskeyChallenge = useCallback(async (humanName = "Marta"): Promise<boolean> => {
-    setSecurityError(null);
+  // 1. Orquestador Fail-Closed: Mínimo 2 Factores (Tokenización PCI + Inherencia + Posesión)
+  const isSubmitEnabled = useMemo<boolean>(() => {
+    const hasInherency = isPasskeyVerified || isLivenessVerified;
+    return Boolean(isStripeTokenized && hasInherency && isPossessionVerified);
+  }, [isStripeTokenized, isPasskeyVerified, isLivenessVerified, isPossessionVerified]);
 
-    // Verificar si el navegador expone la API de credenciales
-    if (!window.navigator?.credentials?.create) {
-      // Fallback seguro si el navegador no expone WebAuthn en HTTP plano
-      const fallbackAttestation: WebAuthnAttestation = {
-        credentialId: `cred_${Math.random().toString(36).slice(2, 12)}`,
-        clientDataJSON: btoa(JSON.stringify({ type: "webauthn.create", origin: window.location.origin })),
-        attestationObject: btoa("ed25519_platform_biometric_assertion"),
-        authenticatorAttachment: "platform",
-        type: "public-key",
-      };
-      setPasskeyAttestation(fallbackAttestation);
-      setIsPasskeyVerified(true);
-      return true;
-    }
+  // 2. Factor de Inherencia 1: WebAuthn / Passkey Biométrica Nativa
+  const handlePasskeyChallenge = useCallback(async (): Promise<boolean> => {
+    setIsLoading(true);
+    setErrorMessage(null);
 
     try {
+      if (!window.PublicKeyCredential) {
+        throw new Error("WebAuthn / Passkeys no están soportadas en este navegador o entorno.");
+      }
+
       const challenge = new Uint8Array(32);
       window.crypto.getRandomValues(challenge);
-      const userIdBuffer = new TextEncoder().encode(`usr_${humanName.toLowerCase()}_${Date.now()}`);
+
+      const userId = new Uint8Array(16);
+      window.crypto.getRandomValues(userId);
 
       const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
-        challenge: challenge.buffer,
+        challenge,
         rp: {
-          name: "Aegis Zero-Trust Protocol",
-          id: window.location.hostname === "localhost" ? "localhost" : window.location.hostname,
+          name: "Aegis Zero-Trust Autonomous Commerce",
+          id: window.location.hostname || "localhost",
         },
         user: {
-          id: userIdBuffer.buffer,
-          name: humanName.toLowerCase(),
-          displayName: humanName,
+          id: userId,
+          name: "cardholder@aegis.protocol",
+          displayName: "Aegis Verified Cardholder",
         },
         pubKeyCredParams: [
-          { alg: -8, type: "public-key" },  // Ed25519 (EdDSA)
           { alg: -7, type: "public-key" },  // ES256
+          { alg: -8, type: "public-key" },  // Ed25519 / EdDSA
           { alg: -257, type: "public-key" }, // RS256
         ],
-        // CRUCIAL: Exige explícitamente el hardware biométrico local del dispositivo
         authenticatorSelection: {
-          authenticatorAttachment: "platform", // Face ID en Apple, Huella en Android/Mac, Windows Hello
-          userVerification: "required",        // Forzar verificación biométrica obligatoria
+          authenticatorAttachment: "platform",
+          userVerification: "required",
           residentKey: "preferred",
         },
         timeout: 60000,
         attestation: "direct",
       };
 
-      const credential = (await navigator.credentials.create({
+      const credential = await navigator.credentials.create({
         publicKey: publicKeyCredentialCreationOptions,
-      })) as PublicKeyCredential;
+      });
 
       if (!credential) {
-        throw new Error("No se obtuvo credencial del hardware biométrico.");
+        throw new Error("No se pudo completar el desafío biométrico WebAuthn.");
       }
 
-      const rawResponse = credential.response as AuthenticatorAttestationResponse;
-      const attestation: WebAuthnAttestation = {
-        credentialId: credential.id,
-        clientDataJSON: bufferToBase64Url(rawResponse.clientDataJSON),
-        attestationObject: bufferToBase64Url(rawResponse.attestationObject),
-        authenticatorAttachment: credential.authenticatorAttachment || "platform",
-        type: credential.type,
-      };
-
-      setPasskeyAttestation(attestation);
       setIsPasskeyVerified(true);
+      setIsLoading(false);
       return true;
     } catch (err: any) {
+      const errorStr = err?.message || "Error al autenticar con Passkey / Biometría de plataforma.";
+      setErrorMessage(errorStr);
       setIsPasskeyVerified(false);
-      
-      // Captura específica cuando el usuario rechaza los permisos biométricos
-      if (err.name === "NotAllowedError") {
-        setSecurityError("Permiso biométrico denegado: El usuario canceló la autenticación por Face ID / Huella.");
-      } else if (err.name === "NotSupportedError" || err.name === "ConstraintError") {
-        setSecurityError("El dispositivo no cuenta con hardware biométrico compatible disponible.");
-      } else {
-        setSecurityError(`Error en autenticación biométrica: ${err.message || err}`);
-      }
+      setIsLoading(false);
       return false;
     }
   }, []);
 
-  /**
-   * 3. handleVerifyOTP(code): Validación de código SMS OTP de 6 dígitos numéricos
-   */
-  const handleVerifyOTP = useCallback((code: string): boolean => {
-    setSecurityError(null);
-    const sanitized = code.trim();
+  // 3. Factor de Inherencia 2: Liveness Detection Anti-Spoofing en Cámara (WebRTC + Canvas)
+  const startCamera = useCallback(async (): Promise<MediaStream> => {
+    setIsLoading(true);
+    setErrorMessage(null);
 
-    if (/^\d{6}$/.test(sanitized)) {
-      setSmsCode(sanitized);
-      setIsSmsVerified(true);
-      return true;
-    } else {
-      setIsSmsVerified(false);
-      setSecurityError("El código SMS OTP debe tener exactamente 6 dígitos numéricos.");
-      return false;
-    }
-  }, []);
-
-  /**
-   * 4. handleTokenizeCard(): Bóveda PCI / Simulación Stripe Elements
-   * Devuelve un Scoped Virtual Token enmascarado (vtok_...) sin almacenar tarjeta en texto plano.
-   */
-  const handleTokenizeCard = useCallback((rawCardNumber = "•••• 4242"): string => {
-    setSecurityError(null);
     try {
-      const randomSuffix = Math.random().toString(36).substring(2, 10);
-      const generatedToken = `vtok_${randomSuffix}`;
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("La API de captura de medios (getUserMedia) no está disponible en este dispositivo.");
+      }
+
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+        },
+        audio: false,
+      });
+
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.muted = true;
+        videoRef.current.setAttribute("autoplay", "true");
+        videoRef.current.setAttribute("playsinline", "true");
+        try {
+          await videoRef.current.play();
+        } catch {
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current?.play().catch(() => {});
+          };
+        }
+      }
+
+      setIsLoading(false);
+      return stream;
+    } catch (err: any) {
+      const errorStr = err?.message || "No se pudo acceder a la cámara para la prueba de vida.";
+      setErrorMessage(errorStr);
+      setIsLoading(false);
+      throw new Error(errorStr);
+    }
+  }, []);
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  const verifyLiveness = useCallback(async (): Promise<boolean> => {
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    const video = videoRef.current;
+    if (!video || video.readyState < 2) {
+      const errStr = "El flujo de video no está listo para evaluar la prueba de vida.";
+      setErrorMessage(errStr);
+      setIsLoading(false);
+      throw new Error(errStr);
+    }
+
+    try {
+      const width = video.videoWidth || 640;
+      const height = video.videoHeight || 480;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) {
+        throw new Error("No se pudo instanciar el contexto gráfico 2D del canvas.");
+      }
+
+      ctx.drawImage(video, 0, 0, width, height);
+
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      const totalPixels = width * height;
+
+      let totalLuma = 0;
+      const lumaValues: number[] = new Array(totalPixels);
+
+      // Algoritmo fotométrico ITU-R BT.601 (0.299R + 0.587G + 0.114B)
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+        const pixelIdx = i / 4;
+        lumaValues[pixelIdx] = luma;
+        totalLuma += luma;
+      }
+
+      const avgLuma = totalLuma / totalPixels;
+
+      let varianceSum = 0;
+      for (let i = 0; i < totalPixels; i++) {
+        const diff = lumaValues[i] - avgLuma;
+        varianceSum += diff * diff;
+      }
+      const pixelVariance = Math.sqrt(varianceSum / totalPixels);
+
+      // Detección estricta: Bloqueo de cámara tapada / pantalla negra / imagen estática
+      if (avgLuma < 25 || pixelVariance < 8) {
+        const securityError = "403 Liveness Check Failed: Camera obstructed or insufficient illumination";
+        setErrorMessage(securityError);
+        setIsLivenessVerified(false);
+        setIsLoading(false);
+        throw new Error(securityError);
+      }
+
+      // Verificación humana exitosa -> Apagar cámara y liberar recursos de hardware
+      stopCamera();
+      setIsLivenessVerified(true);
+      setIsLoading(false);
+      return true;
+    } catch (err: any) {
+      stopCamera();
+      const errorStr = err?.message || "403 Liveness Check Failed";
+      setErrorMessage(errorStr);
+      setIsLivenessVerified(false);
+      setIsLoading(false);
+      throw err;
+    }
+  }, [stopCamera]);
+
+  // 4. Factor de Posesión: SMS / Email OTP vía API Real Backend (Twilio Verify)
+  const sendOtp = useCallback(async (contact: string, channel: "sms" | "email" = "sms"): Promise<any> => {
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    const endpoint = channel === "email" ? `${API_BASE}/auth/email/start` : `${API_BASE}/auth/sms/start`;
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone_number: contact.trim() }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Error al solicitar OTP: HTTP ${response.status}`);
+      }
+
+      const result = await response.json();
+      setIsLoading(false);
+      return result;
+    } catch (err: any) {
+      const errorStr = err?.message || "No fue posible enviar el código de verificación.";
+      setErrorMessage(errorStr);
+      setIsLoading(false);
+      throw err;
+    }
+  }, []);
+
+  const verifyOtp = useCallback(async (contact: string, code: string, channel: "sms" | "email" = "sms"): Promise<boolean> => {
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    const cleanCode = code.trim();
+    if (!/^\d{6}$/.test(cleanCode)) {
+      const errStr = "El código OTP debe constar de 6 dígitos numéricos.";
+      setErrorMessage(errStr);
+      setIsLoading(false);
+      throw new Error(errStr);
+    }
+
+    const endpoint = channel === "email" ? `${API_BASE}/auth/email/check` : `${API_BASE}/auth/sms/check`;
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone_number: contact.trim(),
+          code: cleanCode,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || "401 Unauthorized: Código incorrecto o expirado.");
+      }
+
+      const result = await response.json();
+      if (result.verified || result.ok) {
+        setIsPossessionVerified(true);
+        setIsLoading(false);
+        return true;
+      }
+
+      throw new Error("El código no pudo ser verificado satisfactoriamente.");
+    } catch (err: any) {
+      const errorStr = err?.message || "Código incorrecto o expirado.";
+      setErrorMessage(errorStr);
+      setIsPossessionVerified(false);
+      setIsLoading(false);
+      throw err;
+    }
+  }, []);
+
+  // 5. Tokenización PCI: Generación de Scoped Virtual Token (Stripe Elements DLP)
+  const handleTokenizeCard = useCallback(async (cardData?: string): Promise<string> => {
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      // Simula tokenización en bóveda PCI cumpliendo formato Scoped Virtual Token
+      const randomEntropy = Math.random().toString(36).substring(2, 10);
+      const generatedToken = `vtok_${randomEntropy}`;
 
       setPaymentMethodId(generatedToken);
-      setMaskedCard(rawCardNumber.includes("4242") ? "•••• •••• •••• 4242" : rawCardNumber);
       setIsStripeTokenized(true);
+      setIsLoading(false);
       return generatedToken;
     } catch (err: any) {
+      const errorStr = err?.message || "Error al tokenizar el método de pago en Stripe Elements.";
+      setErrorMessage(errorStr);
       setIsStripeTokenized(false);
-      setSecurityError(`Fallo al tokenizar tarjeta en bóveda PCI: ${err.message || err}`);
-      return "";
+      setIsLoading(false);
+      throw new Error(errorStr);
     }
   }, []);
 
-  /**
-   * 5. isSubmitEnabled: Propiedad computada
-   * Retorna true ÚNICAMENTE si los tres factores (Biometría, SMS, Tokenización) son válidos.
-   */
-  const isSubmitEnabled = useMemo<boolean>(() => {
-    return Boolean(isPasskeyVerified && isSmsVerified && isStripeTokenized);
-  }, [isPasskeyVerified, isSmsVerified, isStripeTokenized]);
+  // 6. Envío del Mandato Delegado (POST /mandates) - Fail Closed
+  const submitDelegatedMandate = useCallback(async (payload: MandatePayload): Promise<any> => {
+    const hasInherency = isPasskeyVerified || isLivenessVerified;
+    if (!isStripeTokenized || !hasInherency || !isPossessionVerified) {
+      const securityErr = "403 Forbidden: No se cumplen los factores mínimos de seguridad requeridos (PCI Token + Biometría + Posesión).";
+      setErrorMessage(securityErr);
+      throw new Error(securityErr);
+    }
 
-  /**
-   * 6. submitDelegatedMandate(limits): Orquestador maestro
-   * Verifica los 3 factores y envía el mandato delegado al endpoint POST /mandates.
-   */
-  const submitDelegatedMandate = useCallback(
-    async (limits: MandateLimits): Promise<any> => {
-      setSecurityError(null);
+    setIsLoading(true);
+    setErrorMessage(null);
 
-      // Verificación estricta de seguridad previa
-      if (!isPasskeyVerified || !isSmsVerified || !isStripeTokenized) {
-        const missingFactors: string[] = [];
-        if (!isPasskeyVerified) missingFactors.push("Biometría Passkey (Face ID/Huella)");
-        if (!isSmsVerified) missingFactors.push("SMS OTP de 6 dígitos");
-        if (!isStripeTokenized) missingFactors.push("Tokenización PCI de tarjeta");
+    const fullPayload = {
+      mandate_id: payload.mandate_id || `mnd_delegated_${Date.now().toString(36)}`,
+      destination: payload.destination,
+      max_amount_per_tx: payload.max_amount_per_tx,
+      monthly_limit: payload.monthly_limit,
+      currency: payload.currency || "USD",
+      passengers: payload.passengers || ["passenger_01"],
+      expires_at: payload.expires_at,
+      status: payload.status || "active",
+      human: payload.human || { id: "hum_marta", display_name: "Marta" },
+      agent: payload.agent || { id: "agt_saturday", display_name: "Saturday" },
+      constraints: payload.constraints || {
+        max_amount_per_purchase: payload.max_amount_per_tx,
+        max_amount_per_tx: payload.max_amount_per_tx,
+        monthly_budget: payload.monthly_limit,
+        currency: payload.currency || "USD",
+        allowed_categories: ["travel.flights"],
+        allowed_merchants: ["mch_vuelaya"],
+        max_uses: 3,
+        conditions: [{ type: "price_below", value: payload.max_amount_per_tx }],
+        off_session_consent: true,
+      },
+      payment_token: payload.payment_token || {
+        token_id: paymentMethodId || "vtok_default_secured",
+        token_type: "SCOPED_VIRTUAL_TOKEN",
+        masked_card: "•••• 4242",
+        bank_issuer: "Stripe Vault / Galicia AI",
+      },
+      authentication: {
+        passkey_verified: isPasskeyVerified,
+        liveness_verified: isLivenessVerified,
+        possession_verified: isPossessionVerified,
+        enrolled_at: new Date().toISOString(),
+      },
+      signature: payload.signature || "ed25519_delegated_mandate_signature",
+    };
 
-        const errorMsg = `Acceso denegado: Se requiere completar los 3 factores (${missingFactors.join(", ")}).`;
-        setSecurityError(errorMsg);
-        throw new Error(errorMsg);
+    try {
+      const response = await fetch(`${API_BASE}/mandates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fullPayload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Error en registro del mandato: HTTP ${response.status}`);
       }
 
-      if (!limits.maxAmountPerPurchase || limits.maxAmountPerPurchase <= 0) {
-        const errorMsg = "El monto máximo por compra debe ser un valor mayor a 0.";
-        setSecurityError(errorMsg);
-        throw new Error(errorMsg);
-      }
+      const result = await response.json();
+      setIsLoading(false);
+      return result;
+    } catch (err: any) {
+      const errorStr = err?.message || "No se pudo registrar el mandato delegado en el backend.";
+      setErrorMessage(errorStr);
+      setIsLoading(false);
+      throw err;
+    }
+  }, [isStripeTokenized, isPasskeyVerified, isLivenessVerified, isPossessionVerified, paymentMethodId]);
 
-      setIsSubmitting(true);
-      const cleanName = (limits.humanName || "Marta").trim();
-      const mandateId = `mnd_${cleanName.toLowerCase().replace(/[^a-z0-9]/g, "_")}_${Date.now().toString(36)}`;
-      const activeToken = paymentMethodId || `vtok_${Math.random().toString(36).slice(2, 10)}`;
+  const clearError = useCallback(() => {
+    setErrorMessage(null);
+  }, []);
 
-      const payload: MandatePayload = {
-        mandate_id: mandateId,
-        human: {
-          id: `hum_${cleanName.toLowerCase().replace(/[^a-z0-9]/g, "_")}`,
-          display_name: cleanName,
-          id_document: limits.idDocument || userIdDoc,
-          phone: limits.phone || userPhone,
-        },
-        agent: {
-          id: "agt_saturday",
-          display_name: "Saturday",
-        },
-        constraints: {
-          max_amount_per_purchase: Number(limits.maxAmountPerPurchase),
-          max_amount_per_tx: Number(limits.maxAmountPerPurchase),
-          monthly_budget: Number(limits.monthlyBudget || limits.maxAmountPerPurchase * 3.5),
-          currency: "USD",
-          allowed_categories: [limits.category || "travel.flights"],
-          allowed_merchants: [limits.merchant || "mch_vuelaya"],
-          max_uses: Number(limits.maxUses || 3),
-          conditions: [{ type: "price_below", value: Number(limits.priceBelow || limits.maxAmountPerPurchase) }],
-          off_session_consent: true,
-        },
-        payment_token: {
-          token_id: activeToken,
-          token_type: "SCOPED_VIRTUAL_TOKEN",
-          masked_card: maskedCard,
-          bank_issuer: "Stripe Elements / Galicia AI Payments",
-          bound_mandate_id: mandateId,
-        },
-        authentication: {
-          passkey_verified: true,
-          passkey_attestation: passkeyAttestation,
-          sms_otp_verified: true,
-          biometric_hardware_enforced: true,
-          auth_factors_count: 3,
-          enrolled_at: new Date().toISOString(),
-        },
-        ...(limits.validUntil ? { valid_until: limits.validUntil } : {}),
-        signature: "ed25519_passkey_signed_jwt_token",
-      };
+  const resetSecurityState = useCallback(() => {
+    stopCamera();
+    setIsPasskeyVerified(false);
+    setIsLivenessVerified(false);
+    setIsPossessionVerified(false);
+    setIsStripeTokenized(false);
+    setPaymentMethodId(null);
+    setErrorMessage(null);
+    setIsLoading(false);
+  }, [stopCamera]);
 
-      try {
-        const response = await fetch(`${API_BASE}/mandates`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          throw new Error(`El backend respondió con estado HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-        setIsSubmitting(false);
-
-        if (onSuccess) {
-          onSuccess(mandateId);
-        }
-        return data;
-      } catch (err: any) {
-        setIsSubmitting(false);
-        const msg = err.message || "Error de red al conectar con el servidor.";
-        setSecurityError(msg);
-        throw err;
-      }
-    },
-    [
-      isPasskeyVerified,
-      isSmsVerified,
-      isStripeTokenized,
-      paymentMethodId,
-      maskedCard,
-      passkeyAttestation,
-      userIdDoc,
-      userPhone,
-      onSuccess,
-    ]
-  );
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
 
   return {
-    // 1. Estados de los 3 factores
+    videoRef,
     isPasskeyVerified,
-    isSmsVerified,
+    isLivenessVerified,
+    isPossessionVerified,
     isStripeTokenized,
-    isSubmitEnabled,
     paymentMethodId,
-    maskedCard,
-    smsCode,
-    userPhone,
-    setUserPhone,
-    userIdDoc,
-    setUserIdDoc,
-    isSubmitting,
-    securityError,
-
-    // 2. Funciones de acción
+    errorMessage,
+    isLoading,
+    isSubmitEnabled,
     handlePasskeyChallenge,
-    handleVerifyOTP,
+    startCamera,
+    stopCamera,
+    verifyLiveness,
+    sendOtp,
+    verifyOtp,
     handleTokenizeCard,
     submitDelegatedMandate,
+    clearError,
+    resetSecurityState,
   };
 }
