@@ -11,7 +11,8 @@ from core.mandate_store import (
     get_mandate,
     record_verification_event,
 )
-from engine.engine_mock import evaluate
+# El engine real decide restricciones; el mock queda disponible para demos aisladas.
+from engine.evaluator import evaluate
 
 
 router = APIRouter()
@@ -125,8 +126,15 @@ def verify_purchase(attempt_purchase: dict[str, Any]):
         )
     security_checks.append({"rule": "status", "pass": True, "detail": "Mandato activo."})
 
-    # 3. El engine solo recibe intentos que ya superaron los controles de seguridad.
-    engine_result = evaluate(mandate, live_state, attempt_purchase)
+    # 3. El engine recibe el intento de compra plano de su contrato: category,
+    # merchant_id, amount y metadata.price, nunca el envoltorio HTTP completo.
+    engine_attempt = attempt_purchase.get("purchase", {})
+    if not isinstance(engine_attempt, dict):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="purchase debe ser un objeto.",
+        )
+    engine_result = evaluate(mandate, live_state, engine_attempt)
     verdict = engine_result["verdict"]
     checks = security_checks + engine_result["checks"]
 

@@ -9,15 +9,13 @@ from core.merchant import get_flights
 
 
 def _price_limit(mandate: dict) -> int | float | None:
-    """Obtiene price_below de formatos simples usados en los mandatos de demo."""
-    conditions = mandate.get("conditions")
-    limits = mandate.get("limits")
-    candidates = [
-        mandate.get("price_below"),
-        conditions.get("price_below") if isinstance(conditions, dict) else None,
-        limits.get("price_below") if isinstance(limits, dict) else None,
-    ]
-    for candidate in candidates:
+    """Lee price_below con el contrato de constraints del engine."""
+    constraints = mandate.get("constraints", {})
+    conditions = constraints.get("conditions", []) if isinstance(constraints, dict) else []
+    for condition in conditions:
+        if not isinstance(condition, dict) or condition.get("type") != "price_below":
+            continue
+        candidate = condition.get("value")
         if isinstance(candidate, Real) and not isinstance(candidate, bool):
             return candidate
     return None

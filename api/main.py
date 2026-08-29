@@ -3,9 +3,16 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, status
 
 from core.mandate_store import create_mandate, get_mandate, revoke_mandate
+from core.seed_loader import load_seed_mandates
 
 
 app = FastAPI()
+
+
+@app.on_event("startup")
+def load_initial_mandates():
+    """Crea estado vivo fresco para cada mandato definido en el archivo semilla."""
+    load_seed_mandates()
 
 
 @app.get("/health")
