@@ -103,14 +103,27 @@ def _get_or_create_keys(entity_id: str) -> Dict[str, str]:
     return _key_registry[entity_id]
 
 
+from fastapi.responses import HTMLResponse
+import os
+
 @app.get("/")
 def root():
     return {
         "status": "online",
         "system": "AgentBuyer Safe Agentic Purchase Protocol",
         "version": "1.0.0",
+        "web_app": "/app",
         "docs": "/docs",
     }
+
+
+@app.get("/app", response_class=HTMLResponse)
+def web_app():
+    static_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "index.html")
+    if os.path.exists(static_file):
+        with open(static_file, "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h1>AgentBuyer Mission Control</h1>"
 
 
 @app.get("/health")
