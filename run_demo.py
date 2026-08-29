@@ -71,6 +71,8 @@ def main():
     mandato, estructura_ia = emitir_mandato_inteligente(
         directiva_humana=directiva_humana,
         presupuesto_referencia=500.0,
+        human_id="marta_traveler",
+        agent_id="agent_marta",
         human_privkey=h_priv,
         human_pubkey=h_pub,
         agent_pubkey=a_pub,
