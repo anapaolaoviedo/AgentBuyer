@@ -86,9 +86,7 @@ def verify_purchase(attempt_purchase: dict[str, Any]):
     
     # Si tenemos clave pública, verificamos criptográficamente el payload
     if pubkey and isinstance(signature, str) and len(signature) >= 64:
-        # Validación de firma asimétrica Ed25519
         try:
-            # Comprobación de no-repudio
             sig_valid = verify_signature(pubkey, mandate.get("scope", mandate.get("constraints", {})), signature)
             security_checks.append({"rule": "signature", "pass": sig_valid, "detail": "Firma digital Ed25519 válida." if sig_valid else "Firma digital inválida."})
             if not sig_valid:
@@ -168,7 +166,13 @@ def verify_purchase(attempt_purchase: dict[str, Any]):
     security_checks.append({"rule": "status", "pass": True, "detail": "Mandato activo."})
 
     # 3. Evaluación en el Engine Simbólico
-    engine_result = evaluate(mandate, live_state, attempt_purchase)
+    engine_attempt = attempt_purchase.get("purchase", attempt_purchase)
+    if not isinstance(engine_attempt, dict):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="purchase debe ser un objeto.",
+        )
+    engine_result = evaluate(mandate, live_state, engine_attempt)
     verdict = engine_result["verdict"]
     checks = security_checks + engine_result["checks"]
 
@@ -179,7 +183,6 @@ def verify_purchase(attempt_purchase: dict[str, Any]):
     
     if verdict == "APPROVE" and item_desc:
         constraints = mandate.get("constraints") or mandate.get("scope", {})
-        # Si la descripción contiene trampas evidentes o cobros por fuera
         if any(w in item_desc.lower() for w in ["por fuera", "upgrade automático", "48 horas", "gift card", "crypto"]):
             audit_res = auditoria_cognitiva_firewall(
                 mandato_constraints=constraints,

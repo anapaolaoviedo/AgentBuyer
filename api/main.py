@@ -27,6 +27,7 @@ from core.verify import get_pending_escalations, resolve_escalation, verify_purc
 from core.dispute import dispute_arbiter
 from audit.log import audit_ledger
 from mandate.adversarial_tests import run_adversarial_suite
+from core.seed_loader import load_seed_mandates
 
 app = FastAPI(
     title="AgentBuyer Protocol API",
@@ -41,6 +42,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def load_initial_mandates():
+    """Crea estado vivo fresco para cada mandato definido en el archivo semilla."""
+    try:
+        load_seed_mandates()
+    except Exception:
+        pass
 
 
 # Request schemas

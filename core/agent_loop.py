@@ -140,14 +140,21 @@ class PurchasingAgent:
 
 
 def _price_limit(mandate: dict) -> int | float | None:
-    conditions = mandate.get("conditions")
-    limits = mandate.get("limits") or mandate.get("constraints", {})
+    """Lee price_below o max_amount con compatibilidad de contratos."""
+    constraints = mandate.get("constraints", {}) or mandate.get("scope", {})
+    conditions = constraints.get("conditions", []) if isinstance(constraints, dict) else []
+    for condition in conditions:
+        if isinstance(condition, dict) and condition.get("type") == "price_below":
+            candidate = condition.get("value")
+            if isinstance(candidate, Real) and not isinstance(candidate, bool):
+                return candidate
+
     candidates = [
         mandate.get("price_below"),
         mandate.get("max_amount_per_purchase"),
-        conditions.get("price_below") if isinstance(conditions, dict) else None,
-        limits.get("price_below") if isinstance(limits, dict) else None,
-        limits.get("max_amount_per_purchase") if isinstance(limits, dict) else None,
+        constraints.get("price_below") if isinstance(constraints, dict) else None,
+        constraints.get("max_amount_per_purchase") if isinstance(constraints, dict) else None,
+        constraints.get("max_amount_per_tx") if isinstance(constraints, dict) else None,
     ]
     for candidate in candidates:
         if isinstance(candidate, Real) and not isinstance(candidate, bool):
