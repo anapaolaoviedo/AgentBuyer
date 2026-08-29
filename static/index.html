@@ -231,7 +231,7 @@
       transform: none;
     }
 
-    /* MODAL DE CÁMARA FACE ID LIMPIO Y MINIMALISTA */
+    /* MODAL DE CÁMARA FACE ID - VISTA NÍTIDA SIN CAPAS OSCURAS */
     .modal-backdrop {
       position: fixed; inset: 0; z-index: 100;
       background: rgba(10, 14, 26, 0.94);
@@ -251,23 +251,23 @@
     }
     .scanner-oval-wrap {
       position: relative;
-      width: 220px;
-      height: 280px;
-      margin: 1.2rem auto;
+      width: 230px;
+      height: 290px;
+      margin: 1rem auto;
       border-radius: 50%;
       overflow: hidden;
-      border: 3px solid #3DDC97;
-      box-shadow: 0 0 30px rgba(61, 220, 151, 0.4);
+      border: 4px solid #3DDC97;
+      box-shadow: 0 0 30px rgba(61, 220, 151, 0.5);
       background: #000;
     }
     #face-video {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
       transform: scaleX(-1);
-      z-index: 1;
+      display: block !important;
+      position: relative;
+      z-index: 2;
     }
     .scan-laser {
       position: absolute;
@@ -275,7 +275,8 @@
       height: 3px;
       background: #3DDC97;
       box-shadow: 0 0 15px #3DDC97;
-      z-index: 2;
+      z-index: 5;
+      pointer-events: none;
       animation: laserMove 2s infinite ease-in-out;
     }
     @keyframes laserMove {
@@ -486,7 +487,7 @@
 <body>
   <div class="starfield"></div>
 
-  <!-- MODAL DE FACE ID (VISTA DE CÁMARA DIRECTA Y LIMPIA) -->
+  <!-- MODAL DE FACE ID (VISTA DE CÁMARA DIRECTA Y NÍTIDA) -->
   <div id="biometric-modal" class="modal-backdrop" style="display: none;">
     <div class="biometric-box">
       <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -784,7 +785,6 @@
   </div>
 
   <script>
-    // 🛡️ ESTADO REACTIVO DE LOS 3 FACTORES ZERO-TRUST
     let isPasskeyVerified = false;
     let isSmsVerified = true;
     let isStripeTokenized = true;
@@ -792,7 +792,6 @@
     let mediaStreamGlobal = null;
     let livenessInterval = null;
 
-    // ABRIR MODAL BIOMÉTRICO (INICIA CÁMARA DIRECTAMENTE)
     async function abrirModalBiometria() {
       document.getElementById('biometric-modal').style.display = 'flex';
       cambiarModoBiometrico('camera');
@@ -830,16 +829,12 @@
         fingerprintBox.style.display = 'none';
         cameraBox.style.display = 'block';
         title.innerText = 'Face ID';
-        statusText.innerText = 'Centra tu rostro en el óvalo...';
+        statusText.innerText = 'Iniciando cámara... Por favor permite el acceso';
 
         try {
-          // Encender la cámara web real directamente
+          // Solicitar cámara al navegador explícitamente
           const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: 'user',
-              width: { ideal: 640 },
-              height: { ideal: 480 }
-            },
+            video: true,
             audio: false
           });
 
@@ -847,20 +842,25 @@
           const videoElem = document.getElementById('face-video');
           videoElem.srcObject = stream;
           videoElem.muted = true;
-          videoElem.play().catch(e => {
-            videoElem.onloadedmetadata = () => videoElem.play();
-          });
+          videoElem.setAttribute('autoplay', '');
+          videoElem.setAttribute('playsinline', '');
 
-          // Iniciar conteo de verificación de 4 segundos
+          // Forzar reproducción del video
+          try {
+            await videoElem.play();
+          } catch(e) {
+            videoElem.onloadedmetadata = () => videoElem.play();
+          }
+
+          statusText.innerText = 'Centra tu rostro en el óvalo...';
           iniciarLivenessDetectionHumana();
 
         } catch (err) {
-          console.warn('Cámara no permitida:', err);
-          statusText.innerText = 'Verificando con sensor local...';
+          console.error('Error de cámara:', err);
+          statusText.innerHTML = '<span style="color:#fca5a5;">⚠️ Haz clic en el ícono de cámara en la barra de URL para permitir el acceso.</span>';
           iniciarLivenessDetectionHumana();
         }
       } else {
-        // Modo Huella Digital
         if (mediaStreamGlobal) {
           mediaStreamGlobal.getTracks().forEach(track => track.stop());
           mediaStreamGlobal = null;
@@ -888,15 +888,15 @@
       let progress = 0;
 
       livenessInterval = setInterval(() => {
-        progress += 5;
+        progress += 4;
         progressBar.style.width = progress + '%';
 
         if (progress === 20) {
           statusText.innerHTML = '🟢 Rostro detectado...';
-        } else if (progress === 50) {
+        } else if (progress === 52) {
           statusText.innerHTML = '👁️ Verificando prueba de vida...';
         } else if (progress === 80) {
-          statusText.innerHTML = '🔐 Sellando con clave Ed25519...';
+          statusText.innerHTML = '🔐 Generando hash Ed25519...';
         } else if (progress >= 100) {
           clearInterval(livenessInterval);
           statusText.innerHTML = '✅ ¡Verificado con éxito!';
@@ -904,7 +904,7 @@
             finalizarVerificacionBiometricaExitosa('Face ID Verificado');
           }, 600);
         }
-      }, 180); // ~3.6 segundos
+      }, 180); // ~4.5 segundos
     }
 
     function finalizarVerificacionBiometricaExitosa(tipo) {
@@ -921,7 +921,6 @@
       }, 600);
     }
 
-    // VERIFICACIÓN SMS OTP
     function onOtpInput(val) {
       if (val.trim().length === 6 && /^\d+$/.test(val.trim())) {
         ejecutarVerificacionSMS();
@@ -955,7 +954,6 @@
       actualizarEstadoBotonSubmit();
     }
 
-    // TOKENIZACIÓN DE TARJETA PCI
     function onCardInput(val) {
       const badge = document.getElementById('badge-token-status');
       if (val.trim().length >= 4) {
@@ -975,7 +973,6 @@
       actualizarEstadoBotonSubmit();
     }
 
-    // COMPUTED: isSubmitEnabled (3/3 FACTORES)
     function actualizarEstadoBotonSubmit() {
       const btn = document.getElementById('btn-submit-mandate');
       const count = (isPasskeyVerified ? 1 : 0) + (isSmsVerified ? 1 : 0) + (isStripeTokenized ? 1 : 0);
@@ -1043,7 +1040,6 @@
         });
       } catch(e) {}
 
-      // Actualizar pantalla 2
       document.getElementById('live-mandate-owner').innerText = `MANDATO ACTIVO · ${name.toUpperCase()}`;
       document.getElementById('live-mandate-id').innerText = mandateId;
       document.getElementById('live-badge-dlp').innerHTML = `🛡️ DLP: ${card} (<code>${activeTokenId}</code>)`;
