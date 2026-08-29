@@ -1,10 +1,10 @@
 """Ciclo del agente comprador que consume el comercio y la verificación."""
 
-from datetime import datetime, timezone
 from numbers import Real
 from uuid import uuid4
 
-from core.mandate_store import VERIFICATION_EVENTS, get_mandate
+from audit.log import append_entry
+from core.mandate_store import get_mandate
 from core.merchant import get_flights
 
 
@@ -55,23 +55,32 @@ def run_agent(mandate_id: str) -> dict:
     verdict = verification["verdict"]
     completed = verdict == "APPROVE"
 
-    # Además del evento de /verify, se registra explícitamente la corrida del agente.
-    VERIFICATION_EVENTS.append(
-        {
-            "mandate_id": mandate_id,
-            "attempt_id": attempt_id,
-            "verdict": verdict,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "event_type": "agent_run",
-        }
-    )
-
     story = (
         f"Encontró {len(flights_seen)} vuelos. "
         + (f"Aplicó el límite price_below de {limit} USD y " if limit is not None else "No encontró un límite price_below utilizable y ")
         + f"eligió {selected_flight['id']} ({selected_flight['route']}) por {selected_flight['price']} USD. "
         + ("La compra fue completada tras recibir APPROVE." if completed else f"La compra no procedió: verify devolvió {verdict}. {verification['human_readable']}")
     )
+    # Además del evento de verify, queda registrada la corrida completa del agente.
+    append_entry(
+        {
+            "type": "agent_run",
+            "mandate_id": mandate_id,
+            "attempt_id": attempt_id,
+            "verdict": verdict,
+            "summary": story,
+        }
+    )
+    if completed:
+        append_entry(
+            {
+                "type": "purchase_completed",
+                "mandate_id": mandate_id,
+                "attempt_id": attempt_id,
+                "verdict": "APPROVE",
+                "summary": f"Compra completada por Saturday: {selected_flight['route']} por {selected_flight['price']} USD.",
+            }
+        )
     return {
         "mandate_id": mandate_id,
         "attempt_id": attempt_id,

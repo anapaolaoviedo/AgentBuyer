@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Saturday, { type SaturdayState } from "./components/Saturday";
 import MandateCreator from "./components/MandateCreator";
+import AccountView from "./components/AccountView";
+import AuditView from "./components/AuditView";
 
 const API_BASE = "http://127.0.0.1:8000";
 
@@ -41,6 +43,7 @@ type AgentRun = {
 };
 
 type DecisionPhase = "idle" | "discovering" | "evaluating" | "choosing" | "verifying";
+type AppView = "mission" | "account" | "audit";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -66,9 +69,10 @@ function wait(milliseconds: number) {
 type MissionControlProps = {
   mandateId: string;
   onCreateNew: () => void;
+  onNavigate: (view: AppView) => void;
 };
 
-function MissionControl({ mandateId, onCreateNew }: MissionControlProps) {
+function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlProps) {
   const [mandate, setMandate] = useState<MandateRecord | null>(null);
   const [flights, setFlights] = useState<Flight[]>([]);
   const [verification, setVerification] = useState<Verification | null>(null);
@@ -297,6 +301,10 @@ function MissionControl({ mandateId, onCreateNew }: MissionControlProps) {
                   ))}
                   </AnimatePresence>
                 </div>
+                {verification && phase === "idle" && <div className="result-links">
+                  {verification.verdict === "APPROVE" && <button onClick={() => onNavigate("account")} type="button">✓ Compra registrada — verla en Mis compras</button>}
+                  <button onClick={() => onNavigate("audit")} type="button">Este intento quedó en el registro — ver en Auditoría →</button>
+                </div>}
               </>
             ) : <p className="empty-copy">{status === "revoked" ? "Mandato revocado — corre el agente para ver el resultado real del siguiente intento." : "Corre a Saturday para ver los checks reales del backend."}</p>}
           </aside>
@@ -318,12 +326,27 @@ function MissionControl({ mandateId, onCreateNew }: MissionControlProps) {
 
 function App() {
   const [activeMandateId, setActiveMandateId] = useState<string | null>(null);
+  const [view, setView] = useState<AppView>("mission");
 
   if (!activeMandateId) {
-    return <MandateCreator onCreated={setActiveMandateId} />;
+    return <MandateCreator onCreated={(mandateId) => { setActiveMandateId(mandateId); setView("mission"); }} />;
   }
 
-  return <MissionControl mandateId={activeMandateId} onCreateNew={() => setActiveMandateId(null)} />;
+  return (
+    <>
+      <nav className="app-nav" aria-label="Navegación principal">
+        <button className="nav-brand" onClick={() => setView("mission")} type="button"><span>Saturday</span><small>by AgentBuyer</small></button>
+        <div className="nav-links">
+          <button className={view === "mission" ? "is-active" : ""} onClick={() => setView("mission")} type="button">Mission Control</button>
+          <button className={view === "account" ? "is-active" : ""} onClick={() => setView("account")} type="button">Mis compras</button>
+          <button className={view === "audit" ? "is-active" : ""} onClick={() => setView("audit")} type="button">Auditoría</button>
+        </div>
+      </nav>
+      {view === "mission" && <MissionControl mandateId={activeMandateId} onCreateNew={() => setActiveMandateId(null)} onNavigate={setView} />}
+      {view === "account" && <AccountView mandateId={activeMandateId} />}
+      {view === "audit" && <AuditView />}
+    </>
+  );
 }
 
 export default App;
