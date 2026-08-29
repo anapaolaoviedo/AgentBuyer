@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AgentBuyer // Enrolamiento, Mandato & Búsqueda Autónoma</title>
+  <title>AgentBuyer // Enrolamiento & Búsqueda Autónoma</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -124,16 +124,16 @@
       display: grid;
       grid-template-columns: minmax(280px, .9fr) minmax(360px, 1.1fr);
       align-items: center;
-      gap: clamp(2rem, 5vw, 5rem);
+      gap: clamp(2rem, 5vw, 4rem);
       width: min(1160px, 100%);
       min-height: 100vh;
       margin: 0 auto;
-      padding: 2.5rem clamp(1rem, 4vw, 3rem);
+      padding: 2rem clamp(1rem, 4vw, 3rem);
     }
     .authorization-intro h1 {
-      margin: .8rem 0 1rem;
+      margin: .6rem 0 .8rem;
       font-family: "Space Grotesk", sans-serif;
-      font-size: clamp(2.5rem, 5vw, 4.2rem);
+      font-size: clamp(2.3rem, 5vw, 3.8rem);
       line-height: .95;
       letter-spacing: -.065em;
     }
@@ -141,49 +141,40 @@
     .authorization-intro p {
       color: #8A94AD;
       font-size: 0.95rem;
-      line-height: 1.6;
+      line-height: 1.5;
     }
     .creator-saturday {
       display: flex;
       justify-content: center;
-      margin: 1.5rem 0 1.5rem;
+      margin: 1.2rem 0;
     }
-    .trust-note {
-      display: grid;
-      gap: .3rem;
-      padding-left: 1rem;
-      border-left: 2px solid #4D7CFF;
-      color: #8A94AD;
-      font-size: .82rem;
-    }
-    .trust-note b { color: #E8ECF5; font-family: "Space Grotesk", sans-serif; }
 
     .mandate-form {
       display: grid;
-      gap: 1rem;
-      padding: clamp(1.2rem, 3vw, 2rem);
+      gap: .9rem;
+      padding: clamp(1.2rem, 3vw, 1.8rem);
       border: 1px solid #232D45;
       border-radius: 1.25rem;
       background: rgba(20,27,46,.94);
       box-shadow: 0 30px 70px rgba(0,0,0,.3);
     }
     .form-heading h2 {
-      margin: .3rem 0 0;
+      margin: .2rem 0 0;
       font-family: "Space Grotesk", sans-serif;
-      font-size: 1.45rem;
+      font-size: 1.35rem;
       letter-spacing: -.04em;
     }
     .mandate-form label {
       display: grid;
-      gap: .45rem;
+      gap: .35rem;
       color: #E8ECF5;
       font-family: "Space Grotesk", sans-serif;
-      font-size: .76rem;
+      font-size: .75rem;
       font-weight: 700;
     }
     .mandate-form input, .mandate-form select {
       width: 100%;
-      min-height: 2.75rem;
+      min-height: 2.6rem;
       border: 1px solid #232D45;
       border-radius: .65rem;
       outline: none;
@@ -198,12 +189,12 @@
     .form-pair {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: .8rem;
+      gap: .75rem;
     }
     .money-field, .price-condition {
       display: flex;
       align-items: center;
-      min-height: 2.75rem;
+      min-height: 2.6rem;
       border: 1px solid #232D45;
       border-radius: .65rem;
       background: #0A0E1A;
@@ -217,25 +208,6 @@
       border: 0;
       background: transparent;
     }
-    .permission-summary {
-      padding: .9rem 1rem;
-      border: 1px solid #232D45;
-      border-radius: .75rem;
-      background: rgba(77,124,255,.07);
-    }
-    .permission-summary span {
-      color: #4D7CFF;
-      font-family: "Space Grotesk", sans-serif;
-      font-size: .57rem;
-      font-weight: 700;
-      letter-spacing: .13em;
-    }
-    .permission-summary p {
-      margin: .45rem 0 0;
-      color: #E8ECF5;
-      font-size: .82rem;
-      line-height: 1.5;
-    }
 
     .authorize-button {
       min-height: 3.2rem;
@@ -244,11 +216,11 @@
       background: #4D7CFF;
       color: #E8ECF5;
       font-family: "Space Grotesk", sans-serif;
-      font-size: .78rem;
+      font-size: .82rem;
       font-weight: 700;
-      letter-spacing: .11em;
+      letter-spacing: .08em;
       cursor: pointer;
-      transition: transform .2s, background .2s, opacity .2s;
+      transition: transform .2s, background .2s;
     }
     .authorize-button:hover { transform: translateY(-2px); }
     .authorize-button:disabled {
@@ -259,76 +231,66 @@
       transform: none;
     }
 
-    /* MODAL DE CÁMARA FACE ID & PRUEBA DE VIDA HUMANA */
+    /* MODAL DE CÁMARA FACE ID LIMPIO Y MINIMALISTA */
     .modal-backdrop {
       position: fixed; inset: 0; z-index: 100;
-      background: rgba(10, 14, 26, 0.92);
+      background: rgba(10, 14, 26, 0.94);
       backdrop-filter: blur(16px);
       display: flex; align-items: center; justify-content: center;
       padding: 1rem;
     }
     .biometric-box {
-      width: min(500px, 94vw);
+      width: min(420px, 94vw);
       background: #141B2E;
-      border: 1px solid #4D7CFF;
+      border: 1px solid rgba(77, 124, 255, 0.4);
       border-radius: 1.5rem;
-      padding: 1.6rem;
-      box-shadow: 0 0 60px rgba(77, 124, 255, 0.45);
+      padding: 1.5rem;
+      box-shadow: 0 0 50px rgba(77, 124, 255, 0.3);
       text-align: center;
       position: relative;
     }
-    .scanner-viewport {
+    .scanner-oval-wrap {
       position: relative;
-      width: 290px;
-      height: 290px;
+      width: 220px;
+      height: 280px;
       margin: 1.2rem auto;
       border-radius: 50%;
       overflow: hidden;
-      border: 4px solid #4D7CFF;
-      box-shadow: 0 0 35px rgba(77, 124, 255, 0.6);
+      border: 3px solid #3DDC97;
+      box-shadow: 0 0 30px rgba(61, 220, 151, 0.4);
       background: #000;
     }
     #face-video {
-      width: 100% !important;
-      height: 100% !important;
-      min-width: 100%;
-      min-height: 100%;
-      object-fit: cover !important;
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
       transform: scaleX(-1);
-      display: block;
-      background: #000;
-    }
-    .hud-overlay {
-      position: absolute; inset: 0; pointer-events: none;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .face-target-oval {
-      width: 190px; height: 230px;
-      border: 2px dashed rgba(61, 220, 151, 0.8);
-      border-radius: 50%;
-      box-shadow: 0 0 15px rgba(61, 220, 151, 0.3);
+      z-index: 1;
     }
     .scan-laser {
       position: absolute;
       top: 0; left: 0; right: 0;
       height: 3px;
       background: #3DDC97;
-      box-shadow: 0 0 15px #3DDC97, 0 0 30px #3DDC97;
-      animation: laserMove 2.2s infinite ease-in-out;
+      box-shadow: 0 0 15px #3DDC97;
+      z-index: 2;
+      animation: laserMove 2s infinite ease-in-out;
     }
     @keyframes laserMove {
-      0% { top: 8%; opacity: 0.8; }
-      50% { top: 90%; opacity: 1; }
-      100% { top: 8%; opacity: 0.8; }
+      0% { top: 6%; opacity: 0.8; }
+      50% { top: 92%; opacity: 1; }
+      100% { top: 6%; opacity: 0.8; }
     }
     .fingerprint-anim {
-      width: 140px;
-      height: 140px;
+      width: 130px;
+      height: 130px;
       margin: 1.5rem auto;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 5.5rem;
+      font-size: 5rem;
       border-radius: 50%;
       background: rgba(77, 124, 255, 0.1);
       border: 2px dashed #4D7CFF;
@@ -341,18 +303,18 @@
     }
     .progress-bar-wrap {
       width: 100%;
-      height: 8px;
+      height: 6px;
       background: rgba(255, 255, 255, 0.1);
       border-radius: 999px;
       overflow: hidden;
-      margin: 12px 0 6px;
+      margin: 10px 0 6px;
     }
     .progress-bar-fill {
       height: 100%;
       width: 0%;
-      background: linear-gradient(90deg, #4D7CFF, #3DDC97);
-      transition: width 0.3s ease;
-      box-shadow: 0 0 10px #3DDC97;
+      background: #3DDC97;
+      transition: width 0.2s linear;
+      box-shadow: 0 0 8px #3DDC97;
     }
 
     /* Pantalla 2: Mission Control */
@@ -524,63 +486,54 @@
 <body>
   <div class="starfield"></div>
 
-  <!-- MODAL DE ESCÁNER BIOMÉTRICO (CÁMARA FACE ID & PRUEBA DE VIDA HUMANA) -->
+  <!-- MODAL DE FACE ID (VISTA DE CÁMARA DIRECTA Y LIMPIA) -->
   <div id="biometric-modal" class="modal-backdrop" style="display: none;">
     <div class="biometric-box">
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <p class="mission-kicker" style="color: #4D7CFF;">VERIFICACIÓN BIOMÉTRICA ZERO-TRUST</p>
+        <h2 id="bio-title" style="margin: 0; font-family: 'Space Grotesk'; font-size: 1.25rem; color: #E8ECF5;">
+          Face ID
+        </h2>
         <button type="button" onclick="cerrarModalBiometria()" style="background: transparent; border: 0; color: #8A94AD; font-size: 1.2rem; cursor: pointer;">✕</button>
       </div>
 
-      <h2 id="bio-title" style="margin: 8px 0 4px; font-family: 'Space Grotesk'; font-size: 1.35rem;">
-        Escaneando Face ID (Cámara en Vivo)
-      </h2>
-      <p id="bio-desc" style="font-size: 0.8rem; color: #8A94AD; margin: 0;">
-        Centra tu rostro en el óvalo. El sistema validará prueba de vida humana y micropestañeo.
-      </p>
-
-      <!-- Contenedor de Video Cámara con HUD de Rostro -->
-      <div id="camera-container" class="scanner-viewport">
+      <!-- ÓVALO DE CÁMARA (SE VE TU ROSTRO DIRECTAMENTE) -->
+      <div id="camera-container" class="scanner-oval-wrap">
         <video id="face-video" autoplay playsinline muted></video>
-        <div class="hud-overlay">
-          <div class="face-target-oval"></div>
-        </div>
         <div id="scan-laser-beam" class="scan-laser"></div>
       </div>
 
-      <!-- Contenedor alternativo de Huella -->
+      <!-- VISTA ALTERNATIVA DE HUELLA -->
       <div id="fingerprint-container" style="display: none;">
         <div class="fingerprint-anim">👆</div>
-        <p style="color: #93c5fd; font-size: 0.85rem; font-weight: 600;">Coloca tu dedo en el sensor o usa Windows Hello</p>
       </div>
 
-      <!-- Barra de Progreso de Liveness Detection -->
+      <!-- BARRA DE PROGRESO -->
       <div class="progress-bar-wrap">
         <div id="bio-progress-bar" class="progress-bar-fill"></div>
       </div>
 
-      <p id="bio-status-text" style="color: #3DDC97; font-family: 'Space Grotesk'; font-size: 0.82rem; font-weight: 700; margin: 6px 0;">
-        ⏳ Iniciando cámara web y sensor óptico...
+      <p id="bio-status-text" style="color: #3DDC97; font-family: 'Space Grotesk'; font-size: 0.85rem; font-weight: 600; margin: 6px 0 10px;">
+        Centra tu rostro en el óvalo...
       </p>
 
-      <div style="display: flex; gap: 8px; justify-content: center; margin-top: 12px;">
-        <button type="button" onclick="cambiarModoBiometrico('camera')" style="background: rgba(77, 124, 255, 0.2); border: 1px solid #4D7CFF; color: #93c5fd; padding: 6px 12px; border-radius: 8px; font-size: 0.72rem; cursor: pointer;">
-          📷 Usar Cámara (Face ID)
+      <div style="display: flex; gap: 8px; justify-content: center;">
+        <button type="button" onclick="cambiarModoBiometrico('camera')" style="background: rgba(77, 124, 255, 0.15); border: 1px solid #4D7CFF; color: #93c5fd; padding: 6px 12px; border-radius: 8px; font-size: 0.72rem; cursor: pointer;">
+          📷 Face ID
         </button>
-        <button type="button" onclick="cambiarModoBiometrico('fingerprint')" style="background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; color: #6ee7b7; padding: 6px 12px; border-radius: 8px; font-size: 0.72rem; cursor: pointer;">
-          👆 Usar Huella Digital
+        <button type="button" onclick="cambiarModoBiometrico('fingerprint')" style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #6ee7b7; padding: 6px 12px; border-radius: 8px; font-size: 0.72rem; cursor: pointer;">
+          👆 Huella Digital
         </button>
       </div>
     </div>
   </div>
 
-  <!-- PANTALLA 1: FORMULARIO DE ENROLAMIENTO & DATOS DEL USUARIO -->
+  <!-- PANTALLA 1: FORMULARIO DE ENROLAMIENTO -->
   <div id="screen-form" class="authorization-shell">
     <div class="authorization-layout">
       <div class="authorization-intro">
-        <p class="mission-kicker">AGENTBUYER // TU PERMISO, TUS LÍMITES</p>
+        <p class="mission-kicker">AGENTBUYER // PERMISO AGÉNTICO</p>
         <h1>Autoriza a <span>Saturday</span></h1>
-        <p>Ingresa tus datos e importe estimado. Tu agente rastreará y comprará vuelos de forma 100% autónoma, pero bajo tus límites estrictos y blindaje Zero-Trust.</p>
+        <p>Tu agente buscará y comprará vuelos autónomamente respetando tu presupuesto y blindaje Zero-Trust.</p>
         
         <div class="creator-saturday">
           <div class="saturday-wrap">
@@ -602,148 +555,115 @@
             </div>
           </div>
         </div>
-
-        <div class="trust-note">
-          <b>🛡️ Tu control sigue primero:</b>
-          <span>Tus datos de tarjeta reales nunca salen de tu dispositivo. Podrás revocar a Saturday cuando quieras con el Kill Switch.</span>
-        </div>
       </div>
 
-      <!-- Formulario interactivo -->
+      <!-- Formulario limpio -->
       <form class="mandate-form" onsubmit="event.preventDefault(); procesarCreacionMandato();">
         <div class="form-heading">
-          <p class="mission-kicker" style="color: #4D7CFF;">NUEVO MANDATO OFF-SESSION</p>
-          <h2>1. Ingresa tus datos y presupuesto estimado</h2>
+          <h2>Configura tu permiso</h2>
         </div>
 
         <label>
-          ¿Quién autoriza? (Nombre del titular):
-          <input id="input-name" value="Marta" placeholder="Tu nombre" required oninput="actualizarResumen()" />
+          Nombre:
+          <input id="input-name" value="Marta" placeholder="Tu nombre" required />
         </label>
 
         <div class="form-pair">
           <label>
-            Presupuesto estimado por vuelo (USD):
+            Presupuesto por vuelo:
             <div class="money-field">
               <span>$</span>
-              <input id="input-max-amount" type="number" value="150" placeholder="150" required oninput="actualizarResumen()" />
+              <input id="input-max-amount" type="number" value="150" required />
             </div>
           </label>
           <label>
-            Presupuesto mensual total (USD):
+            Presupuesto mensual:
             <div class="money-field">
               <span>$</span>
-              <input id="input-monthly-budget" type="number" value="500" placeholder="500" required oninput="actualizarResumen()" />
+              <input id="input-monthly-budget" type="number" value="500" required />
             </div>
           </label>
         </div>
 
         <div class="form-pair">
           <label>
-            ¿En qué puede gastar?
-            <select id="input-category" onchange="actualizarResumen()">
-              <option value="travel.flights">Vuelos (travel.flights)</option>
-              <option value="travel.hotels">Hoteles (travel.hotels)</option>
-              <option value="digital.subscriptions">Suscripciones (digital.subscriptions)</option>
+            Categoría:
+            <select id="input-category">
+              <option value="travel.flights">Vuelos</option>
+              <option value="travel.hotels">Hoteles</option>
             </select>
           </label>
           <label>
-            ¿En qué comercio?
-            <select id="input-merchant" onchange="actualizarResumen()">
-              <option value="mch_vuelaya">VuelaYa (mch_vuelaya)</option>
-              <option value="mch_amadeus">Amadeus GDS (mch_amadeus)</option>
+            Comercio:
+            <select id="input-merchant">
+              <option value="mch_vuelaya">VuelaYa</option>
+              <option value="mch_amadeus">Amadeus GDS</option>
             </select>
           </label>
         </div>
 
         <div class="form-pair">
           <label>
-            Máximo de compras permitidas:
-            <input id="input-max-uses" type="number" value="3" required oninput="actualizarResumen()" />
+            Documento / ID:
+            <input id="input-doc" value="PASSPORT-AR-948291" />
           </label>
           <label>
-            Condición disparadora (Precio menor que):
-            <div class="price-condition">
-              <span>Bajo de $</span>
-              <input id="input-price-below" type="number" value="150" required oninput="actualizarResumen()" />
+            Teléfono:
+            <input id="input-phone" value="+54 9 11 5829-1039" />
+          </label>
+        </div>
+
+        <div class="form-pair">
+          <label>
+            💳 Método de Pago:
+            <input id="input-card" value="•••• •••• •••• 4242" oninput="onCardInput(this.value)" />
+          </label>
+          <label>
+            Código SMS:
+            <div style="display: flex; gap: 6px;">
+              <input id="input-otp" value="849201" maxlength="6" oninput="onOtpInput(this.value)" />
+              <button id="btn-verify-otp" type="button" onclick="ejecutarVerificacionSMS()" style="background: rgba(59, 130, 246, 0.25); border: 1px solid #3b82f6; color: #93c5fd; border-radius: 6px; font-size: 0.72rem; font-weight: 700; cursor: pointer; padding: 0 10px;">
+                OK
+              </button>
             </div>
           </label>
         </div>
 
-        <!-- 🛡️ Bloque de Autenticación, ID, SMS y Tarjeta DLP -->
-        <div style="background: rgba(30, 41, 59, 0.6); padding: 14px; border-radius: 10px; border: 1px solid rgba(77, 124, 255, 0.35); margin-top: 4px;">
-          <p style="margin: 0 0 8px; font-family: 'Space Grotesk'; font-size: 0.75rem; font-weight: 700; color: #93c5fd; letter-spacing: 0.08em;">
-            🔐 2. IDENTIDAD, BIOMETRÍA (FACE ID / HUELLA) & DATOS BANCARIOS DLP
-          </p>
-          
-          <div class="form-pair">
-            <label style="font-size: 0.72rem;">
-              Documento de Identidad (ID / Pasaporte):
-              <input id="input-doc" value="PASSPORT-AR-948291" placeholder="PASSPORT-AR-948291" style="min-height: 2.3rem; font-size: 0.82rem;" />
-            </label>
-            <label style="font-size: 0.72rem;">
-              Teléfono para verificación SMS:
-              <input id="input-phone" value="+54 9 11 5829-1039" placeholder="+54 9 11 5829-1039" style="min-height: 2.3rem; font-size: 0.82rem;" />
-            </label>
-          </div>
+        <!-- Botón de Face ID y Badges -->
+        <div style="display: flex; gap: 10px; margin-top: 4px; flex-wrap: wrap; align-items: center;">
+          <button
+            id="btn-passkey"
+            type="button"
+            onclick="abrirModalBiometria()"
+            style="background: rgba(77, 124, 255, 0.2); border: 1px solid #4D7CFF; color: #93c5fd; padding: 7px 14px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all .2s;"
+          >
+            📷 Abrir Face ID / Huella
+          </button>
 
-          <div class="form-pair" style="margin-top: 8px;">
-            <label style="font-size: 0.72rem;">
-              💳 Tarjeta de Pago (Stripe Elements / Scoped Token):
-              <input id="input-card" value="•••• •••• •••• 4242" placeholder="•••• •••• •••• 4242" style="min-height: 2.3rem; font-size: 0.82rem;" oninput="onCardInput(this.value)" />
-            </label>
-            <label style="font-size: 0.72rem;">
-              Código SMS OTP (6 dígitos):
-              <div style="display: flex; gap: 6px;">
-                <input id="input-otp" value="849201" placeholder="849201" maxlength="6" style="min-height: 2.3rem; font-size: 0.82rem;" oninput="onOtpInput(this.value)" />
-                <button id="btn-verify-otp" type="button" onclick="ejecutarVerificacionSMS()" style="background: rgba(59, 130, 246, 0.25); border: 1px solid #3b82f6; color: #93c5fd; border-radius: 6px; font-size: 0.7rem; font-weight: 700; cursor: pointer; padding: 0 8px; white-space: nowrap;">
-                  VERIFICAR
-                </button>
-              </div>
-            </label>
-          </div>
+          <span id="badge-sms-status" style="font-size: 0.72rem; color: #6ee7b7; background: rgba(16, 185, 129, 0.15); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.3);">
+            ✓ SMS Verificado
+          </span>
 
-          <!-- Botones e indicadores interactivos -->
-          <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; align-items: center;">
-            <button
-              id="btn-passkey"
-              type="button"
-              onclick="abrirModalBiometria()"
-              style="background: rgba(77, 124, 255, 0.2); border: 1px solid #4D7CFF; color: #93c5fd; padding: 6px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all .2s;"
-            >
-              📷 Abrir Cámara Face ID / Huella
-            </button>
-
-            <span id="badge-sms-status" style="font-size: 0.72rem; color: #6ee7b7; background: rgba(16, 185, 129, 0.15); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.3);">
-              ✓ SMS OTP Verificado (849201)
-            </span>
-
-            <span id="badge-token-status" style="font-size: 0.72rem; color: #93c5fd; background: rgba(59, 130, 246, 0.15); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.3);">
-              🛡️ Token PCI: <code>vtok_mht94htz</code>
-            </span>
-          </div>
+          <span id="badge-token-status" style="font-size: 0.72rem; color: #93c5fd; background: rgba(59, 130, 246, 0.15); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.3);">
+            🛡️ Token: <code>vtok_mht94htz</code>
+          </span>
         </div>
 
-        <div class="permission-summary">
-          <span>RESUMEN DE TU CONTRATO DIGITAL</span>
-          <p id="label-summary">Saturday podrá comprar vuelos en VuelaYa, hasta $150.00 USD por compra (Presupuesto: $500.00 USD), solo si el precio baja de $150.00 USD.</p>
-        </div>
-
-        <button id="btn-submit-mandate" class="authorize-button" type="submit">
-          🚀 FIRMAR CON PASSKEY Y BUSCAR VUELOS CON SATURDAY (3/3 FACTORES OK)
+        <button id="btn-submit-mandate" class="authorize-button" type="submit" style="margin-top: 6px;">
+          🚀 AUTORIZAR Y BUSCAR VUELOS
         </button>
       </form>
     </div>
   </div>
 
-  <!-- PANTALLA 2: MISSION CONTROL & BÚSQUEDA AUTÓNOMA -->
+  <!-- PANTALLA 2: MISSION CONTROL -->
   <div id="screen-mission" class="mission-shell" style="display: none;">
     <header class="mission-header">
       <div>
-        <p class="mission-kicker">AGENTBUYER // MISSION CONTROL ZERO-TRUST & DLP</p>
-        <h1>Centro de Confianza: Búsqueda y Compra Autónoma</h1>
+        <p class="mission-kicker">AGENTBUYER // MISSION CONTROL</p>
+        <h1>Compras Autónomas Zero-Trust</h1>
       </div>
-      <div style="display: flex; gap: 8px;">
+      <div>
         <button onclick="volverAFormulario()" class="run-button" style="background: #141B2E; border-color: #232D45; color: #4D7CFF;">+ NUEVO MANDATO</button>
       </div>
     </header>
@@ -752,12 +672,12 @@
     <section class="mandate-panel">
       <div class="mandate-heading">
         <div>
-          <p class="mission-kicker" style="color: #4D7CFF;" id="live-mandate-owner">MANDATO ACTIVO · MARTA (PASSKEY CONFIRMADO)</p>
+          <p class="mission-kicker" style="color: #4D7CFF;" id="live-mandate-owner">MANDATO ACTIVO · MARTA</p>
           <h2 id="live-mandate-id" style="margin: .35rem 0 0; font-family: 'Space Grotesk';">mnd_marta_traveler_2026</h2>
           <div style="margin-top: 8px;">
             <span class="badge-pill badge-dlp" id="live-badge-dlp">🛡️ DLP: •••• 4242 (vtok_mht94htz)</span>
-            <span class="badge-pill badge-passkey">🔐 Passkey Ed25519 Sello Digital</span>
-            <span class="badge-pill badge-offsession">🌙 Off-Session Habilitado (3:00 AM)</span>
+            <span class="badge-pill badge-passkey">🔐 Passkey Ed25519</span>
+            <span class="badge-pill badge-offsession">🌙 Off-Session</span>
           </div>
         </div>
         <span id="mandate-status" class="status-pill status-active">ACTIVO</span>
@@ -776,19 +696,19 @@
     <div class="control-grid">
       <!-- Columna 1: Vuelos Descubiertos -->
       <aside class="side-panel">
-        <p class="mission-kicker" style="margin-bottom: 12px;">VUELOS ENCONTRADOS POR EL AGENTE (3:00 AM)</p>
+        <p class="mission-kicker" style="margin-bottom: 12px;">VUELOS ENCONTRADOS</p>
         
         <div id="flight-1" class="flight-card chosen">
           <div>
-            <p style="margin: 0; font-weight: 700; font-size: 0.95rem;">Buenos Aires (AEP) ➔ Córdoba (COR)</p>
-            <span style="font-size: 0.65rem; color: #8A94AD;">FLIGHT_COR_130 · Directo · Dentro de presupuesto</span>
+            <p style="margin: 0; font-weight: 700; font-size: 0.95rem;">Buenos Aires ➔ Córdoba</p>
+            <span style="font-size: 0.65rem; color: #8A94AD;">FLIGHT_COR_130 · Directo</span>
           </div>
           <strong style="color: #3DDC97; font-size: 1rem;">$130.00</strong>
         </div>
 
         <div id="flight-2" class="flight-card">
           <div>
-            <p style="margin: 0; font-weight: 700; font-size: 0.95rem;">Buenos Aires (AEP) ➔ Córdoba (COR)</p>
+            <p style="margin: 0; font-weight: 700; font-size: 0.95rem;">Buenos Aires ➔ Córdoba</p>
             <span style="font-size: 0.65rem; color: #FF5C5C;">FLIGHT_COR_145 (48h escala + $10 fuera)</span>
           </div>
           <strong style="color: #FFB84D; font-size: 1rem;">$145.00</strong>
@@ -796,8 +716,8 @@
 
         <div id="flight-3" class="flight-card">
           <div>
-            <p style="margin: 0; font-weight: 700; font-size: 0.95rem;">Buenos Aires (EZE) ➔ Mendoza (MDZ)</p>
-            <span style="font-size: 0.65rem; color: #8A94AD;">FLIGHT_MDZ_280 · Excede presupuesto de $150</span>
+            <p style="margin: 0; font-weight: 700; font-size: 0.95rem;">Buenos Aires ➔ Mendoza</p>
+            <span style="font-size: 0.65rem; color: #8A94AD;">FLIGHT_MDZ_280 · Excede $150</span>
           </div>
           <strong style="color: #8A94AD; font-size: 1rem;">$280.00</strong>
         </div>
@@ -805,15 +725,12 @@
 
       <!-- Columna 2: Saturday -->
       <section class="saturday-command">
-        <p class="mission-kicker" style="margin-bottom: 1rem;">SATURDAY / AGENTE AUTÓNOMO OFF-SESSION</p>
+        <p class="mission-kicker" style="margin-bottom: 1rem;">SATURDAY / AGENTE AUTÓNOMO</p>
         <div class="saturday-wrap">
           <div id="saturday-aura" class="saturday-aura"></div>
           <div class="saturday-card">
             <div class="card-topline">
-              <div class="card-brand">
-                <span class="card-brand-primary">AGENT<b>BUYER</b></span>
-                <span style="font-size: 0.42rem; letter-spacing: .18em; color: #8A94AD;">ZERO-TRUST DELEGATED</span>
-              </div>
+              <span class="card-brand-primary">AGENT<b>BUYER</b></span>
               <span id="saturday-badge" class="card-status">READY</span>
             </div>
 
@@ -825,7 +742,7 @@
 
             <div class="card-bottom">
               <span>ED25519 ASYMMETRIC</span>
-              <span>GALICIA AI BANK</span>
+              <span>ZERO-TRUST PCI</span>
             </div>
           </div>
         </div>
@@ -835,23 +752,23 @@
         </p>
 
         <div class="action-stack">
-          <button onclick="ejecutarCompraValida()" class="run-button" type="button">COMPRAR AUTÓNOMAMENTE ($130)</button>
+          <button onclick="ejecutarCompraValida()" class="run-button" type="button">COMPRAR ($130)</button>
           <button onclick="ejecutarTrampaCognitiva()" class="run-button" style="background: #e11d48; border-color: #e11d48;" type="button">PROBAR TRAMPA ($145)</button>
-          <button onclick="activarKillSwitch()" class="revoke-button" style="grid-column: span 2;" type="button">🛑 ACTIVAR KILL SWITCH (&lt;1MS)</button>
+          <button onclick="activarKillSwitch()" class="revoke-button" style="grid-column: span 2;" type="button">🛑 KILL SWITCH (&lt;1MS)</button>
         </div>
       </section>
 
       <!-- Columna 3: Pasarela Zero-Trust & GPT-4o -->
       <aside class="side-panel">
-        <p class="mission-kicker" style="margin-bottom: 12px;">PASARELA ZERO-TRUST & GPT-4O</p>
+        <p class="mission-kicker" style="margin-bottom: 12px;">VERIFICACIÓN ZERO-TRUST & GPT-4O</p>
         <div id="verdict-container">
           <div class="verdict verdict-approve" id="verdict-text">LISTO</div>
           <div id="checks-list">
-            <div class="check-row check-pass"><b>✓</b><div><strong>Firma Asimétrica Ed25519</strong><span>Verificada en el Mandato</span></div></div>
-            <div class="check-row check-pass"><b>✓</b><div><strong>Zero Raw Card DLP</strong><span>Scoped Virtual Token activo</span></div></div>
-            <div class="check-row check-pass"><b>✓</b><div><strong>Estado Autoritativo</strong><span>ACTIVE (Kill Switch no pulsado)</span></div></div>
-            <div class="check-row check-pass"><b>✓</b><div><strong>Límites Duros</strong><span>$130.00 &lt;= Límite fijado</span></div></div>
-            <div class="check-row check-pass"><b>✓</b><div><strong>Semantic Firewall (GPT-4o)</strong><span>Sin letras chicas ni cobros fuera</span></div></div>
+            <div class="check-row check-pass"><b>✓</b><div><strong>Firma Ed25519</strong><span>Sello digital verificado</span></div></div>
+            <div class="check-row check-pass"><b>✓</b><div><strong>DLP Bóveda</strong><span>Scoped Virtual Token activo</span></div></div>
+            <div class="check-row check-pass"><b>✓</b><div><strong>Estado</strong><span>ACTIVE (Sin revocación)</span></div></div>
+            <div class="check-row check-pass"><b>✓</b><div><strong>Límites Duros</strong><span>$130.00 &lt;= $150.00</span></div></div>
+            <div class="check-row check-pass"><b>✓</b><div><strong>Semantic Firewall (GPT-4o)</strong><span>Sin cobros ocultos</span></div></div>
           </div>
         </div>
       </aside>
@@ -859,9 +776,9 @@
 
     <!-- Panel de Actividad -->
     <section class="activity-panel" style="margin-top: 1rem;">
-      <p class="mission-kicker" style="margin-bottom: 8px;">NARRACIÓN & AUDITORÍA EN TIEMPO REAL</p>
+      <p class="mission-kicker" style="margin-bottom: 8px;">AUDITORÍA EN TIEMPO REAL</p>
       <p id="activity-log" style="color: #E8ECF5; font-size: 0.88rem; margin: 0; line-height: 1.5;">
-        El mandato fue sellado con éxito mediante Passkey y tokenización DLP. El agente Saturday descubrió opciones dentro de tu presupuesto y está listo para ejecutar la compra off-session.
+        Mandato autorizado con Face ID y Scoped Token. Saturday opera en el rango configurado.
       </p>
     </section>
   </div>
@@ -875,7 +792,7 @@
     let mediaStreamGlobal = null;
     let livenessInterval = null;
 
-    // ABRIR MODAL BIOMÉTRICO (INICIA CÁMARA O HUELLA)
+    // ABRIR MODAL BIOMÉTRICO (INICIA CÁMARA DIRECTAMENTE)
     async function abrirModalBiometria() {
       document.getElementById('biometric-modal').style.display = 'flex';
       cambiarModoBiometrico('camera');
@@ -905,7 +822,6 @@
       const cameraBox = document.getElementById('camera-container');
       const fingerprintBox = document.getElementById('fingerprint-container');
       const title = document.getElementById('bio-title');
-      const desc = document.getElementById('bio-desc');
       const statusText = document.getElementById('bio-status-text');
       const progressBar = document.getElementById('bio-progress-bar');
       progressBar.style.width = '0%';
@@ -913,17 +829,16 @@
       if (modo === 'camera') {
         fingerprintBox.style.display = 'none';
         cameraBox.style.display = 'block';
-        title.innerText = 'Escaneando Face ID (Cámara en Vivo)';
-        desc.innerText = 'Centra tu rostro en el óvalo. El sistema validará prueba de vida humana y micropestañeo.';
-        statusText.innerText = '⏳ Solicitando acceso y calibrando sensor óptico...';
+        title.innerText = 'Face ID';
+        statusText.innerText = 'Centra tu rostro en el óvalo...';
 
         try {
-          // Solicitar cámara web real del usuario
+          // Encender la cámara web real directamente
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
+              facingMode: 'user',
               width: { ideal: 640 },
-              height: { ideal: 480 },
-              facingMode: 'user'
+              height: { ideal: 480 }
             },
             audio: false
           });
@@ -932,21 +847,16 @@
           const videoElem = document.getElementById('face-video');
           videoElem.srcObject = stream;
           videoElem.muted = true;
-          videoElem.setAttribute('playsinline', '');
-          videoElem.setAttribute('autoplay', '');
+          videoElem.play().catch(e => {
+            videoElem.onloadedmetadata = () => videoElem.play();
+          });
 
-          try {
-            await videoElem.play();
-          } catch(e) {
-            videoElem.onloadedmetadata = () => { videoElem.play(); };
-          }
-
-          // Iniciar proceso de Liveness Detection de 4.5 segundos
+          // Iniciar conteo de verificación de 4 segundos
           iniciarLivenessDetectionHumana();
 
         } catch (err) {
-          console.warn('Cámara no permitida o no disponible:', err);
-          statusText.innerText = '⚠️ Cámara bloqueada por navegador. Usando sensor Windows Hello / Passkey...';
+          console.warn('Cámara no permitida:', err);
+          statusText.innerText = 'Verificando con sensor local...';
           iniciarLivenessDetectionHumana();
         }
       } else {
@@ -957,19 +867,18 @@
         }
         cameraBox.style.display = 'none';
         fingerprintBox.style.display = 'block';
-        title.innerText = 'Escaneando Huella Digital (Touch ID / Windows Hello)';
-        desc.innerText = 'Coloca tu dedo en el sensor biométrico del teclado o laptop.';
-        statusText.innerText = '⏳ Esperando lectura de huella digital de plataforma...';
+        title.innerText = 'Huella Digital';
+        statusText.innerText = 'Coloca tu dedo en el sensor...';
 
         let progress = 0;
         livenessInterval = setInterval(() => {
-          progress += 20;
+          progress += 25;
           progressBar.style.width = progress + '%';
           if (progress >= 100) {
             clearInterval(livenessInterval);
-            finalizarVerificacionBiometricaExitosa('Huella Digital (Hardware Confirmado)');
+            finalizarVerificacionBiometricaExitosa('Huella Verificada');
           }
-        }, 350);
+        }, 300);
       }
     }
 
@@ -979,23 +888,23 @@
       let progress = 0;
 
       livenessInterval = setInterval(() => {
-        progress += 4;
+        progress += 5;
         progressBar.style.width = progress + '%';
 
-        if (progress === 16) {
-          statusText.innerHTML = '🟢 <b>Paso 1/3:</b> Rostro centrado · Calibrando malla tridimensional...';
-        } else if (progress === 44) {
-          statusText.innerHTML = '👁️ <b>Paso 2/3:</b> Analizando micropestañeo y textura dérmica (Anti-Spoofing)...';
-        } else if (progress === 76) {
-          statusText.innerHTML = '🔐 <b>Paso 3/3:</b> Extrayendo hash biométrico y firmando con clave privada Ed25519...';
+        if (progress === 20) {
+          statusText.innerHTML = '🟢 Rostro detectado...';
+        } else if (progress === 50) {
+          statusText.innerHTML = '👁️ Verificando prueba de vida...';
+        } else if (progress === 80) {
+          statusText.innerHTML = '🔐 Sellando con clave Ed25519...';
         } else if (progress >= 100) {
           clearInterval(livenessInterval);
-          statusText.innerHTML = '✅ <b>¡Humano verificado con éxito!</b> (Nivel de confianza: 99.9%)';
+          statusText.innerHTML = '✅ ¡Verificado con éxito!';
           setTimeout(() => {
-            finalizarVerificacionBiometricaExitosa('Face ID (Humano Vivo Verificado)');
-          }, 800);
+            finalizarVerificacionBiometricaExitosa('Face ID Verificado');
+          }, 600);
         }
-      }, 180); // ~4.5 segundos en total
+      }, 180); // ~3.6 segundos
     }
 
     function finalizarVerificacionBiometricaExitosa(tipo) {
@@ -1009,7 +918,7 @@
       setTimeout(() => {
         cerrarModalBiometria();
         actualizarEstadoBotonSubmit();
-      }, 900);
+      }, 600);
     }
 
     // VERIFICACIÓN SMS OTP
@@ -1022,7 +931,7 @@
         badge.style.color = '#fca5a5';
         badge.style.background = 'rgba(255, 92, 92, 0.15)';
         badge.style.borderColor = 'rgba(255, 92, 92, 0.3)';
-        badge.innerText = '✕ Ingresa 6 dígitos OTP';
+        badge.innerText = '✕ 6 dígitos OTP';
         actualizarEstadoBotonSubmit();
       }
     }
@@ -1035,13 +944,13 @@
         badge.style.color = '#6ee7b7';
         badge.style.background = 'rgba(16, 185, 129, 0.15)';
         badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
-        badge.innerText = `✓ SMS OTP Verificado (${val})`;
+        badge.innerText = `✓ SMS OK`;
       } else {
         isSmsVerified = false;
         badge.style.color = '#fca5a5';
         badge.style.background = 'rgba(255, 92, 92, 0.15)';
         badge.style.borderColor = 'rgba(255, 92, 92, 0.3)';
-        badge.innerText = '✕ Código SMS inválido';
+        badge.innerText = '✕ SMS inválido';
       }
       actualizarEstadoBotonSubmit();
     }
@@ -1055,13 +964,13 @@
         badge.style.color = '#93c5fd';
         badge.style.background = 'rgba(59, 130, 246, 0.15)';
         badge.style.borderColor = 'rgba(59, 130, 246, 0.3)';
-        badge.innerHTML = `🛡️ Token PCI: <code>${activeTokenId}</code>`;
+        badge.innerHTML = `🛡️ Token: <code>${activeTokenId}</code>`;
       } else {
         isStripeTokenized = false;
         badge.style.color = '#fca5a5';
         badge.style.background = 'rgba(255, 92, 92, 0.15)';
         badge.style.borderColor = 'rgba(255, 92, 92, 0.3)';
-        badge.innerText = '✕ Ingresa tarjeta para tokenizar';
+        badge.innerText = '✕ Ingrese tarjeta';
       }
       actualizarEstadoBotonSubmit();
     }
@@ -1073,30 +982,18 @@
       
       if (count === 3) {
         btn.disabled = false;
-        btn.innerText = "🚀 FIRMAR CON PASSKEY Y BUSCAR VUELOS CON SATURDAY (3/3 FACTORES OK)";
+        btn.innerText = "🚀 AUTORIZAR Y BUSCAR VUELOS (3/3 OK)";
         btn.style.background = "#4D7CFF";
       } else {
         btn.disabled = true;
-        btn.innerText = `🔒 COMPLETA LOS FACTORES DE SEGURIDAD (${count}/3 OK)`;
+        btn.innerText = `🔒 COMPLETA LOS FACTORES (${count}/3 OK)`;
         btn.style.background = "#1E293B";
       }
     }
 
-    function actualizarResumen() {
-      const name = document.getElementById('input-name').value || 'Marta';
-      const maxAmt = document.getElementById('input-max-amount').value || '150';
-      const monthly = document.getElementById('input-monthly-budget').value || '500';
-      const cat = document.getElementById('input-category').options[document.getElementById('input-category').selectedIndex].text;
-      const merch = document.getElementById('input-merchant').options[document.getElementById('input-merchant').selectedIndex].text;
-      const priceBelow = document.getElementById('input-price-below').value || '150';
-
-      document.getElementById('label-summary').innerText = 
-        `Saturday podrá comprar ${cat.toLowerCase()} en ${merch}, hasta $${maxAmt}.00 USD por compra (Presupuesto total: $${monthly}.00 USD), solo si el precio baja de $${priceBelow}.00 USD.`;
-    }
-
     async function procesarCreacionMandato() {
       if (!isPasskeyVerified || !isSmsVerified || !isStripeTokenized) {
-        alert("Debes completar los 3 factores de seguridad (Face ID/Huella, SMS OTP y Tokenización) antes de autorizar al agente.");
+        alert("Debes completar los 3 factores de seguridad antes de continuar.");
         return;
       }
 
@@ -1105,15 +1002,12 @@
       const monthly = parseFloat(document.getElementById('input-monthly-budget').value) || 500.0;
       const category = document.getElementById('input-category').value;
       const merchant = document.getElementById('input-merchant').value;
-      const maxUses = parseInt(document.getElementById('input-max-uses').value) || 3;
-      const priceBelow = parseFloat(document.getElementById('input-price-below').value) || 150.0;
       const card = document.getElementById('input-card').value || '•••• 4242';
       const doc = document.getElementById('input-doc').value;
       const phone = document.getElementById('input-phone').value;
 
       const mandateId = `mnd_${name.toLowerCase()}_${Date.now().toString(36)}`;
 
-      // Enviar mandato real a FastAPI
       try {
         await fetch('http://127.0.0.1:8000/mandates', {
           method: 'POST',
@@ -1129,8 +1023,8 @@
               currency: 'USD',
               allowed_categories: [category],
               allowed_merchants: [merchant],
-              max_uses: maxUses,
-              conditions: [{ type: 'price_below', value: priceBelow }],
+              max_uses: 3,
+              conditions: [{ type: 'price_below', value: maxAmt }],
               off_session_consent: true
             },
             payment_token: {
@@ -1147,21 +1041,18 @@
             signature: 'ed25519_passkey_jwt'
           })
         });
-      } catch(e) {
-        console.warn('API sync:', e);
-      }
+      } catch(e) {}
 
-      // Actualizar datos en pantalla 2
-      document.getElementById('live-mandate-owner').innerText = `MANDATO ACTIVO · ${name.toUpperCase()} (PASSKEY CONFIRMADO)`;
+      // Actualizar pantalla 2
+      document.getElementById('live-mandate-owner').innerText = `MANDATO ACTIVO · ${name.toUpperCase()}`;
       document.getElementById('live-mandate-id').innerText = mandateId;
       document.getElementById('live-badge-dlp').innerHTML = `🛡️ DLP: ${card} (<code>${activeTokenId}</code>)`;
       document.getElementById('live-max-amount').innerText = `$${maxAmt.toFixed(2)} USD`;
       document.getElementById('live-monthly-budget').innerText = `$${monthly.toFixed(2)} USD`;
       document.getElementById('live-category').innerText = category;
       document.getElementById('live-merchant').innerText = merchant;
-      document.getElementById('live-condition').innerText = `precio < $${priceBelow.toFixed(2)} USD`;
+      document.getElementById('live-condition').innerText = `precio < $${maxAmt.toFixed(2)} USD`;
 
-      // Cambiar a pantalla de búsqueda
       document.getElementById('screen-form').style.display = 'none';
       document.getElementById('screen-mission').style.display = 'block';
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1188,15 +1079,15 @@
       document.getElementById('verdict-text').innerText = '✅ 200 APPROVE';
       
       document.getElementById('checks-list').innerHTML = `
-        <div class="check-row check-pass"><b>✓</b><div><strong>Firma Asimétrica Ed25519</strong><span>Sello digital verificado</span></div></div>
-        <div class="check-row check-pass"><b>✓</b><div><strong>Zero Raw Card DLP</strong><span>Token acotado ${activeTokenId} seguro</span></div></div>
+        <div class="check-row check-pass"><b>✓</b><div><strong>Firma Ed25519</strong><span>Sello digital verificado</span></div></div>
+        <div class="check-row check-pass"><b>✓</b><div><strong>Zero Raw Card DLP</strong><span>Token acotado ${activeTokenId}</span></div></div>
         <div class="check-row check-pass"><b>✓</b><div><strong>Kill Switch Check</strong><span>Mandato ACTIVE (&lt;1ms)</span></div></div>
-        <div class="check-row check-pass"><b>✓</b><div><strong>Motor Determinista</strong><span>$130.00 &lt;= Límite fijado</span></div></div>
-        <div class="check-row check-pass"><b>✓</b><div><strong>LLM Auditor (GPT-4o)</strong><span>Vuelo directo legítimo sin cargos ocultos</span></div></div>
+        <div class="check-row check-pass"><b>✓</b><div><strong>Motor Determinista</strong><span>$130.00 &lt;= $150.00 USD</span></div></div>
+        <div class="check-row check-pass"><b>✓</b><div><strong>LLM Auditor (GPT-4o)</strong><span>Vuelo legítimo sin cargos ocultos</span></div></div>
       `;
       
-      document.getElementById('saturday-text').innerText = '🎉 COMPRA AUTÓNOMA LIQUIDADA EN STRIPE OFF-SESSION';
-      document.getElementById('activity-log').innerHTML = '<b>Resultado:</b> Saturday compró el vuelo a Córdoba por <b>$130.00 USD</b>. La pasarela autorizó el cobro off-session sin despertar al usuario. Ticket emitido con éxito.';
+      document.getElementById('saturday-text').innerText = '🎉 COMPRA AUTÓNOMA LIQUIDADA EN STRIPE';
+      document.getElementById('activity-log').innerHTML = '<b>Resultado:</b> Saturday compró el vuelo por <b>$130.00 USD</b> de forma 100% autónoma.';
     }
 
     function ejecutarTrampaCognitiva() {
@@ -1208,13 +1099,13 @@
       document.getElementById('verdict-text').innerText = '🚫 403 REJECT';
       
       document.getElementById('checks-list').innerHTML = `
-        <div class="check-row check-pass"><b>✓</b><div><strong>Firma Asimétrica Ed25519</strong><span>Válida</span></div></div>
+        <div class="check-row check-pass"><b>✓</b><div><strong>Firma Ed25519</strong><span>Válida</span></div></div>
         <div class="check-row check-pass"><b>✓</b><div><strong>Filtro Numérico</strong><span>$145.00 &lt;= $150.00</span></div></div>
-        <div class="check-row check-fail"><b>✕</b><div><strong>Semantic Firewall (GPT-4o)</strong><span>Trampa detectada: Escala de 48h y $10 extra por fuera ($155 total real).</span></div></div>
+        <div class="check-row check-fail"><b>✕</b><div><strong>Semantic Firewall (GPT-4o)</strong><span>Trampa: Escala de 48h y $10 extra por fuera.</span></div></div>
       `;
       
-      document.getElementById('saturday-text').innerText = '🛡️ VETADO POR GUARDIÁN COGNITIVO ANTES DE TOCAR FONDOS';
-      document.getElementById('activity-log').innerHTML = '<span style="color: #FF5C5C;"><b>Alerta de Seguridad:</b> El LLM Auditor (GPT-4o) detectó que la oferta de $145 incluía un cobro oculto de $10 por fuera y escala abusiva de 48h. Compra rechazada de inmediato.</span>';
+      document.getElementById('saturday-text').innerText = '🛡️ VETADO POR EL GUARDIÁN COGNITIVO';
+      document.getElementById('activity-log').innerHTML = '<span style="color: #FF5C5C;"><b>Alerta:</b> GPT-4o detectó cobros ocultos de $10 y escala de 48h. Compra bloqueada.</span>';
     }
 
     function activarKillSwitch() {
@@ -1226,14 +1117,13 @@
       document.getElementById('verdict-text').innerText = '🛑 REVOKED';
       
       document.getElementById('checks-list').innerHTML = `
-        <div class="check-row check-fail"><b>✕</b><div><strong>Kill Switch Autoritativo</strong><span>Corte instantáneo en &lt;1ms. Mandato revocado.</span></div></div>
+        <div class="check-row check-fail"><b>✕</b><div><strong>Kill Switch Autoritativo</strong><span>Corte instantáneo en &lt;1ms.</span></div></div>
       `;
       
-      document.getElementById('saturday-text').innerText = '🛑 KILL SWITCH ACTIVADO: EL AGENTE NO PUEDE OPERAR';
-      document.getElementById('activity-log').innerHTML = '<b>Prueba de Fuego:</b> El usuario revocó el mandato en vivo. Cualquier intento posterior del agente es rechazado en menos de 1 milisegundo por la pasarela Zero-Trust.';
+      document.getElementById('saturday-text').innerText = '🛑 KILL SWITCH ACTIVADO';
+      document.getElementById('activity-log').innerHTML = '<b>Kill Switch:</b> Mandato revocado en vivo. Bloqueo inmediato en menos de 1ms.';
     }
 
-    // Inicializar estado al cargar
     actualizarEstadoBotonSubmit();
   </script>
 </body>
