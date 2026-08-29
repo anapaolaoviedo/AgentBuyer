@@ -6,10 +6,10 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
 
+from audit.log import append_entry
 from core.mandate_store import (
     apply_approved_purchase,
     get_mandate,
-    record_verification_event,
 )
 # El engine real decide restricciones; el mock queda disponible para demos aisladas.
 from engine.evaluator import evaluate
@@ -32,7 +32,15 @@ def _finish(
 ) -> dict:
     """Registra toda decisión antes de devolverla al comercio."""
     decided_at = _timestamp()
-    record_verification_event(mandate_id, attempt_id, verdict, decided_at)
+    append_entry(
+        {
+            "type": "verification",
+            "mandate_id": mandate_id,
+            "attempt_id": attempt_id,
+            "verdict": verdict,
+            "summary": human_readable,
+        }
+    )
     return {
         "attempt_id": attempt_id,
         "mandate_id": mandate_id,
