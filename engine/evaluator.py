@@ -4,6 +4,19 @@ from typing import Any, Dict, List, Tuple
 from engine.grammar import parse_and_evaluate
 
 
+def _normalize_attempt(attempt: dict) -> dict:
+    """Acepta el shape plano del contrato Y el anidado que envía core/
+    ({"purchase": {...}}) — el engine es defensivo con cualquiera de los dos."""
+    if not isinstance(attempt, dict):
+        return {}
+    purchase = attempt.get("purchase")
+    if isinstance(purchase, dict):
+        # Flatten metadata and fields while preserving attempt_id/mandate_id
+        merged = {**attempt, **purchase}
+        return merged
+    return attempt
+
+
 def _fmt(n: Any) -> str:
     """150.0 -> '150', 149.99 -> '149.99' — keeps details readable in the demo UI."""
     if isinstance(n, float) and n == int(n):
@@ -99,18 +112,18 @@ def evaluate(mandate: dict, live_state: dict, attempt: dict) -> dict:
 
         constraints = mandate.get("constraints") or mandate.get("scope", {})
         live_state_safe = live_state if isinstance(live_state, dict) else {}
+        norm_attempt = _normalize_attempt(attempt)
         checks: list[dict] = []
 
         # 1. Reglas directas de constraints
-        # Chequear monto si existe en alguna variante
         if any(k in constraints for k in ["max_amount_per_purchase", "max_amount", "max_amount_per_tx"]):
-            checks.append(_check_amount(constraints, live_state_safe, attempt))
+            checks.append(_check_amount(constraints, live_state_safe, norm_attempt))
         if "allowed_categories" in constraints:
-            checks.append(_check_category(constraints, live_state_safe, attempt))
+            checks.append(_check_category(constraints, live_state_safe, norm_attempt))
         if "allowed_merchants" in constraints:
-            checks.append(_check_merchant(constraints, live_state_safe, attempt))
+            checks.append(_check_merchant(constraints, live_state_safe, norm_attempt))
         if any(k in constraints for k in ["max_uses", "max_executions_per_month"]):
-            checks.append(_check_uses(constraints, live_state_safe, attempt))
+            checks.append(_check_uses(constraints, live_state_safe, norm_attempt))
 
         # 2. Condiciones estructuradas
         for condition in constraints.get("conditions", []):
@@ -118,12 +131,11 @@ def evaluate(mandate: dict, live_state: dict, attempt: dict) -> dict:
                 cond_type = condition.get("type")
                 check_fn = _CONDITION_CHECKS.get(cond_type)
                 if check_fn is not None:
-                    checks.append(check_fn(condition, live_state_safe, attempt))
+                    checks.append(check_fn(condition, live_state_safe, norm_attempt))
                 else:
-                    # Generic field check
                     field = condition.get("field", "destination")
                     val = condition.get("value")
-                    actual = attempt.get("metadata", {}).get(field)
+                    actual = norm_attempt.get("metadata", {}).get(field)
                     ok = str(actual).lower() == str(val).lower() if actual is not None else False
                     checks.append({
                         "rule": f"condition.{cond_type}",
@@ -132,11 +144,11 @@ def evaluate(mandate: dict, live_state: dict, attempt: dict) -> dict:
                     })
             elif isinstance(condition, str):
                 ctx = {
-                    "price": attempt.get("amount"),
-                    "amount": attempt.get("amount"),
-                    "category": attempt.get("category"),
-                    "merchant": attempt.get("merchant_id"),
-                    **attempt.get("metadata", {})
+                    "price": norm_attempt.get("amount"),
+                    "amount": norm_attempt.get("amount"),
+                    "category": norm_attempt.get("category"),
+                    "merchant": norm_attempt.get("merchant_id"),
+                    **norm_attempt.get("metadata", {})
                 }
                 c_pass = parse_and_evaluate(condition, ctx)
                 checks.append({
@@ -149,11 +161,11 @@ def evaluate(mandate: dict, live_state: dict, attempt: dict) -> dict:
         conditions_expr = constraints.get("conditions_expression")
         if conditions_expr and isinstance(conditions_expr, str):
             ctx = {
-                "price": attempt.get("amount"),
-                "amount": attempt.get("amount"),
-                "category": attempt.get("category"),
-                "merchant": attempt.get("merchant_id"),
-                **attempt.get("metadata", {})
+                "price": norm_attempt.get("amount"),
+                "amount": norm_attempt.get("amount"),
+                "category": norm_attempt.get("category"),
+                "merchant": norm_attempt.get("merchant_id"),
+                **norm_attempt.get("metadata", {})
             }
             c_pass = parse_and_evaluate(conditions_expr, ctx)
             checks.append({
