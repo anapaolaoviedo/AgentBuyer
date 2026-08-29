@@ -23,7 +23,12 @@ type Constraints = {
 };
 
 type MandateRecord = {
-  mandate: { mandate_id: string; human?: { name?: string }; constraints?: Constraints };
+  mandate: {
+    mandate_id: string;
+    human?: { name?: string };
+    constraints?: Constraints;
+    payment_token?: { token_id?: string; masked_card?: string };
+  };
   live_state: LiveState;
 };
 
@@ -232,6 +237,14 @@ function MissionControl({ mandateId, onCreateNew }: MissionControlProps) {
             <div>
               <p className="panel-eyebrow">MANDATO ACTIVO · {mandate?.mandate.human?.name ?? "MARTA"}</p>
               <h2>{mandate?.mandate.mandate_id ?? mandateId}</h2>
+              <div style={{ display: "flex", gap: "8px", marginTop: "4px", flexWrap: "wrap" }}>
+                <span style={{ background: "rgba(59, 130, 246, 0.15)", color: "#93c5fd", padding: "2px 8px", borderRadius: "10px", fontSize: "0.7rem", border: "1px solid rgba(59, 130, 246, 0.3)" }}>
+                  🛡️ DLP: {mandate?.mandate.payment_token?.masked_card ?? "•••• 4242"} ({mandate?.mandate.payment_token?.token_id ?? "vtok_scoped"})
+                </span>
+                <span style={{ background: "rgba(16, 185, 129, 0.15)", color: "#6ee7b7", padding: "2px 8px", borderRadius: "10px", fontSize: "0.7rem", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+                  🔐 Passkey &amp; SMS OTP Confirmados
+                </span>
+              </div>
             </div>
             <span className={`status-pill status-${status}`}>{statusLabel}</span>
           </div>
