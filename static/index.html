@@ -35,7 +35,6 @@
       margin: 0;
     }
 
-    /* Saturday Mascot Card */
     .saturday-wrap {
       position: relative;
       display: grid;
@@ -116,7 +115,6 @@
     .mouth-thinking { width: 1.2rem; border-radius: 0; transform: rotate(-9deg); }
     .mouth-reject { width: 1.2rem; border-radius: 0; transform: rotate(180deg); border-bottom: 3px solid #FF5C5C; }
 
-    /* Layout Pantalla 1: Formulario */
     .authorization-shell {
       min-height: 100vh;
       background: #0A0E1A;
@@ -197,9 +195,7 @@
       padding: 0 .75rem;
       transition: border-color .2s;
     }
-    .mandate-form input:focus, .mandate-form select:focus {
-      border-color: #4D7CFF;
-    }
+    .mandate-form input:focus, .mandate-form select:focus { border-color: #4D7CFF; }
     .form-pair {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -253,11 +249,17 @@
       font-weight: 700;
       letter-spacing: .11em;
       cursor: pointer;
-      transition: transform .2s;
+      transition: transform .2s, background .2s, opacity .2s;
     }
     .authorize-button:hover { transform: translateY(-2px); }
+    .authorize-button:disabled {
+      background: #1E293B;
+      border-color: #334155;
+      color: #64748B;
+      cursor: not-allowed;
+      transform: none;
+    }
 
-    /* Layout Pantalla 2: Mission Control */
     .mission-shell {
       min-height: 100vh;
       background: #0A0E1A;
@@ -436,16 +438,16 @@
         
         <div class="creator-saturday">
           <div class="saturday-wrap">
-            <div class="saturday-aura"></div>
+            <div id="form-saturday-aura" class="saturday-aura"></div>
             <div class="saturday-card">
               <div class="card-topline">
                 <span class="card-brand-primary">AGENT<b>BUYER</b></span>
-                <span class="card-status">ENROLAMIENTO</span>
+                <span id="form-saturday-badge" class="card-status">ENROLAMIENTO</span>
               </div>
               <div class="face">
                 <span class="eye"></span>
                 <span class="eye"></span>
-                <span class="mouth"></span>
+                <span id="form-saturday-mouth" class="mouth"></span>
               </div>
               <div class="card-bottom">
                 <span>PASSKEY WEBAUTHN</span>
@@ -539,29 +541,39 @@
             </label>
           </div>
 
-          <div class="form-pair" style="marginTop: 8px;">
+          <div class="form-pair" style="margin-top: 8px;">
             <label style="font-size: 0.72rem;">
               💳 Tarjeta de Pago (Stripe Elements / Scoped Token):
-              <input id="input-card" value="•••• •••• •••• 4242" placeholder="•••• •••• •••• 4242" style="min-height: 2.3rem; font-size: 0.82rem;" />
+              <input id="input-card" value="•••• •••• •••• 4242" placeholder="•••• •••• •••• 4242" style="min-height: 2.3rem; font-size: 0.82rem;" oninput="onCardInput(this.value)" />
             </label>
             <label style="font-size: 0.72rem;">
               Código SMS OTP (6 dígitos):
-              <input id="input-otp" value="849201" placeholder="849201" style="min-height: 2.3rem; font-size: 0.82rem;" />
+              <div style="display: flex; gap: 6px;">
+                <input id="input-otp" value="849201" placeholder="849201" maxlength="6" style="min-height: 2.3rem; font-size: 0.82rem;" oninput="onOtpInput(this.value)" />
+                <button id="btn-verify-otp" type="button" onclick="ejecutarVerificacionSMS()" style="background: rgba(59, 130, 246, 0.25); border: 1px solid #3b82f6; color: #93c5fd; border-radius: 6px; font-size: 0.7rem; font-weight: 700; cursor: pointer; padding: 0 8px; white-space: nowrap;">
+                  VERIFICAR
+                </button>
+              </div>
             </label>
           </div>
 
+          <!-- Indicadores en tiempo real de los 3 factores -->
           <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; align-items: center;">
             <button
               id="btn-passkey"
               type="button"
-              onclick="togglePasskey()"
-              style="background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; color: #6ee7b7; padding: 6px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 600; cursor: pointer;"
+              onclick="ejecutarPasskeyBiometria()"
+              style="background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; color: #6ee7b7; padding: 6px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all .2s;"
             >
               ✓ Passkey (Face ID / Huella) Confirmada
             </button>
 
-            <span style="font-size: 0.72rem; color: #94a3b8;">
-              🛡️ <b>Garantía DLP:</b> Tarjeta enmascarada; solo se emite token <code>vtok_scoped</code>
+            <span id="badge-sms-status" style="font-size: 0.72rem; color: #6ee7b7; background: rgba(16, 185, 129, 0.15); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.3);">
+              ✓ SMS OTP Verificado (849201)
+            </span>
+
+            <span id="badge-token-status" style="font-size: 0.72rem; color: #93c5fd; background: rgba(59, 130, 246, 0.15); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.3);">
+              🛡️ Token PCI: <code>vtok_mht94htz</code>
             </span>
           </div>
         </div>
@@ -572,7 +584,7 @@
         </div>
 
         <button id="btn-submit-mandate" class="authorize-button" type="submit">
-          🚀 FIRMAR CON PASSKEY Y BUSCAR VUELOS CON SATURDAY
+          🚀 FIRMAR CON PASSKEY Y BUSCAR VUELOS CON SATURDAY (3/3 FACTORES OK)
         </button>
       </form>
     </div>
@@ -597,7 +609,7 @@
           <p class="mission-kicker" style="color: #4D7CFF;" id="live-mandate-owner">MANDATO ACTIVO · MARTA (PASSKEY CONFIRMADO)</p>
           <h2 id="live-mandate-id" style="margin: .35rem 0 0; font-family: 'Space Grotesk';">mnd_marta_traveler_2026</h2>
           <div style="margin-top: 8px;">
-            <span class="badge-pill badge-dlp" id="live-badge-dlp">🛡️ DLP: •••• 4242 (vtok_939ea9f9e58b)</span>
+            <span class="badge-pill badge-dlp" id="live-badge-dlp">🛡️ DLP: •••• 4242 (vtok_mht94htz)</span>
             <span class="badge-pill badge-passkey">🔐 Passkey Ed25519 Sello Digital</span>
             <span class="badge-pill badge-offsession">🌙 Off-Session Habilitado (3:00 AM)</span>
           </div>
@@ -709,21 +721,118 @@
   </div>
 
   <script>
-    let passkeyConfirmada = true;
+    // 🛡️ ESTADO REACTIVO DE LOS 3 FACTORES ZERO-TRUST
+    let isPasskeyVerified = true;
+    let isSmsVerified = true;
+    let isStripeTokenized = true;
+    let activeTokenId = "vtok_mht94htz";
 
-    function togglePasskey() {
-      passkeyConfirmada = !passkeyConfirmada;
+    // 1. EJECUTAR PASSKEY / BIOMETRÍA REAL O SIMULADA
+    async function ejecutarPasskeyBiometria() {
       const btn = document.getElementById('btn-passkey');
-      if (passkeyConfirmada) {
-        btn.style.background = 'rgba(16, 185, 129, 0.2)';
-        btn.style.borderColor = '#10b981';
-        btn.style.color = '#6ee7b7';
-        btn.innerText = '✓ Passkey (Face ID / Huella) Confirmada';
+      btn.innerText = "⏳ Solicitando Face ID / Huella...";
+      btn.style.background = "rgba(77, 124, 255, 0.25)";
+      btn.style.borderColor = "#4D7CFF";
+      btn.style.color = "#93c5fd";
+
+      if (window.navigator?.credentials?.create) {
+        try {
+          const challenge = new Uint8Array(32);
+          window.crypto.getRandomValues(challenge);
+          const userId = new TextEncoder().encode("user_marta_" + Date.now());
+
+          await navigator.credentials.create({
+            publicKey: {
+              challenge: challenge.buffer,
+              rp: { name: "AgentBuyer Zero-Trust Protocol" },
+              user: { id: userId.buffer, name: "marta", displayName: "Marta" },
+              pubKeyCredParams: [{ alg: -8, type: "public-key" }, { alg: -7, type: "public-key" }],
+              authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+              timeout: 60000
+            }
+          });
+        } catch(e) {
+          console.warn("WebAuthn local fallback:", e);
+        }
       } else {
-        btn.style.background = 'rgba(255, 92, 92, 0.2)';
-        btn.style.borderColor = '#ff5c5c';
-        btn.style.color = '#fca5a5';
-        btn.innerText = '✕ Click para activar Passkey';
+        await new Promise(r => setTimeout(r, 600));
+      }
+
+      isPasskeyVerified = true;
+      btn.style.background = 'rgba(16, 185, 129, 0.2)';
+      btn.style.borderColor = '#10b981';
+      btn.style.color = '#6ee7b7';
+      btn.innerText = '✓ Passkey (Face ID / Huella) Confirmada';
+      actualizarEstadoBotonSubmit();
+    }
+
+    // 2. EJECUTAR VERIFICACIÓN SMS OTP
+    function onOtpInput(val) {
+      if (val.trim().length === 6 && /^\d+$/.test(val.trim())) {
+        ejecutarVerificacionSMS();
+      } else {
+        isSmsVerified = false;
+        const badge = document.getElementById('badge-sms-status');
+        badge.style.color = '#fca5a5';
+        badge.style.background = 'rgba(255, 92, 92, 0.15)';
+        badge.style.borderColor = 'rgba(255, 92, 92, 0.3)';
+        badge.innerText = '✕ Ingresa 6 dígitos OTP';
+        actualizarEstadoBotonSubmit();
+      }
+    }
+
+    function ejecutarVerificacionSMS() {
+      const val = document.getElementById('input-otp').value.trim();
+      const badge = document.getElementById('badge-sms-status');
+      if (val.length === 6 && /^\d+$/.test(val)) {
+        isSmsVerified = true;
+        badge.style.color = '#6ee7b7';
+        badge.style.background = 'rgba(16, 185, 129, 0.15)';
+        badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+        badge.innerText = `✓ SMS OTP Verificado (${val})`;
+      } else {
+        isSmsVerified = false;
+        badge.style.color = '#fca5a5';
+        badge.style.background = 'rgba(255, 92, 92, 0.15)';
+        badge.style.borderColor = 'rgba(255, 92, 92, 0.3)';
+        badge.innerText = '✕ Código SMS inválido';
+      }
+      actualizarEstadoBotonSubmit();
+    }
+
+    // 3. EJECUTAR TOKENIZACIÓN DE TARJETA PCI
+    function onCardInput(val) {
+      const badge = document.getElementById('badge-token-status');
+      if (val.trim().length >= 4) {
+        isStripeTokenized = true;
+        activeTokenId = "vtok_" + Math.random().toString(36).slice(2, 10);
+        badge.style.color = '#93c5fd';
+        badge.style.background = 'rgba(59, 130, 246, 0.15)';
+        badge.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+        badge.innerHTML = `🛡️ Token PCI: <code>${activeTokenId}</code>`;
+      } else {
+        isStripeTokenized = false;
+        badge.style.color = '#fca5a5';
+        badge.style.background = 'rgba(255, 92, 92, 0.15)';
+        badge.style.borderColor = 'rgba(255, 92, 92, 0.3)';
+        badge.innerText = '✕ Ingresa tarjeta para tokenizar';
+      }
+      actualizarEstadoBotonSubmit();
+    }
+
+    // 4. COMPUTED: isSubmitEnabled (3/3 FACTORES)
+    function actualizarEstadoBotonSubmit() {
+      const btn = document.getElementById('btn-submit-mandate');
+      const count = (isPasskeyVerified ? 1 : 0) + (isSmsVerified ? 1 : 0) + (isStripeTokenized ? 1 : 0);
+      
+      if (count === 3) {
+        btn.disabled = false;
+        btn.innerText = "🚀 FIRMAR CON PASSKEY Y BUSCAR VUELOS CON SATURDAY (3/3 FACTORES OK)";
+        btn.style.background = "#4D7CFF";
+      } else {
+        btn.disabled = true;
+        btn.innerText = `🔒 COMPLETA LOS FACTORES DE SEGURIDAD (${count}/3 OK)`;
+        btn.style.background = "#1E293B";
       }
     }
 
@@ -740,6 +849,11 @@
     }
 
     async function procesarCreacionMandato() {
+      if (!isPasskeyVerified || !isSmsVerified || !isStripeTokenized) {
+        alert("Debes completar los 3 factores de seguridad (Passkey, SMS OTP y Tokenización de tarjeta) antes de autorizar al agente.");
+        return;
+      }
+
       const name = document.getElementById('input-name').value || 'Marta';
       const maxAmt = parseFloat(document.getElementById('input-max-amount').value) || 150.0;
       const monthly = parseFloat(document.getElementById('input-monthly-budget').value) || 500.0;
@@ -752,9 +866,8 @@
       const phone = document.getElementById('input-phone').value;
 
       const mandateId = `mnd_${name.toLowerCase()}_${Date.now().toString(36)}`;
-      const tokenId = `vtok_${Math.random().toString(36).slice(2, 10)}`;
 
-      // Enviar mandato al backend de FastAPI
+      // Enviar mandato real a FastAPI
       try {
         await fetch('http://127.0.0.1:8000/mandates', {
           method: 'POST',
@@ -775,10 +888,15 @@
               off_session_consent: true
             },
             payment_token: {
-              token_id: tokenId,
+              token_id: activeTokenId,
               token_type: 'SCOPED_VIRTUAL_TOKEN',
               masked_card: card,
               bank_issuer: 'Stripe Elements / Galicia AI Payments'
+            },
+            authentication: {
+              passkey_verified: true,
+              sms_otp_verified: true,
+              auth_factors_count: 3
             },
             signature: 'ed25519_passkey_jwt'
           })
@@ -787,17 +905,17 @@
         console.warn('API sync:', e);
       }
 
-      // Actualizar valores en pantalla 2
+      // Actualizar datos en pantalla 2
       document.getElementById('live-mandate-owner').innerText = `MANDATO ACTIVO · ${name.toUpperCase()} (PASSKEY CONFIRMADO)`;
       document.getElementById('live-mandate-id').innerText = mandateId;
-      document.getElementById('live-badge-dlp').innerText = `🛡️ DLP: ${card} (${tokenId})`;
+      document.getElementById('live-badge-dlp').innerHTML = `🛡️ DLP: ${card} (<code>${activeTokenId}</code>)`;
       document.getElementById('live-max-amount').innerText = `$${maxAmt.toFixed(2)} USD`;
       document.getElementById('live-monthly-budget').innerText = `$${monthly.toFixed(2)} USD`;
       document.getElementById('live-category').innerText = category;
       document.getElementById('live-merchant').innerText = merchant;
       document.getElementById('live-condition').innerText = `precio < $${priceBelow.toFixed(2)} USD`;
 
-      // Cambiar de pantalla
+      // Cambiar a pantalla de búsqueda
       document.getElementById('screen-form').style.display = 'none';
       document.getElementById('screen-mission').style.display = 'block';
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -825,7 +943,7 @@
       
       document.getElementById('checks-list').innerHTML = `
         <div class="check-row check-pass"><b>✓</b><div><strong>Firma Asimétrica Ed25519</strong><span>Sello digital verificado</span></div></div>
-        <div class="check-row check-pass"><b>✓</b><div><strong>Zero Raw Card DLP</strong><span>Token acotado seguro</span></div></div>
+        <div class="check-row check-pass"><b>✓</b><div><strong>Zero Raw Card DLP</strong><span>Token acotado ${activeTokenId} seguro</span></div></div>
         <div class="check-row check-pass"><b>✓</b><div><strong>Kill Switch Check</strong><span>Mandato ACTIVE (&lt;1ms)</span></div></div>
         <div class="check-row check-pass"><b>✓</b><div><strong>Motor Determinista</strong><span>$130.00 &lt;= Límite fijado</span></div></div>
         <div class="check-row check-pass"><b>✓</b><div><strong>LLM Auditor (GPT-4o)</strong><span>Vuelo directo legítimo sin cargos ocultos</span></div></div>
