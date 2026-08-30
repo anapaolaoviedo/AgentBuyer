@@ -105,9 +105,12 @@ def _build_prompt(category: str, fields: dict, max_results: int) -> str:
 
     if category == "flights":
         base = (
-            f"Search for flights from {fields['origin']} to {fields['destination']} "
-            f"departing {fields['departure_date']} on {', '.join(spec['merchants'])}. "
-            f"Return the {max_results} cheapest results."
+            f"Search for real, currently listed airline flights from {fields['origin']} to "
+            f"{fields['destination']} departing on or near {fields['departure_date']} on "
+            f"{', '.join(spec['merchants'])}. Interpret 3-letter IATA/city codes (e.g. BUE, MEX, "
+            f"COR) and full city names alike. Return up to {max_results} of the cheapest available "
+            f"fares you can find for this route. If fares for the exact date are unavailable, return "
+            f"representative current fares for the same route rather than an empty list."
         )
     elif category == "hotels":
         base = (

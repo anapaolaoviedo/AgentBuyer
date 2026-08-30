@@ -7,11 +7,11 @@ from core.verify import verify_purchase
 
 # Catálogo funcional mock VuelaYa
 FLIGHTS: list[dict] = [
-    {"id": "FLIGHT_COR_130", "route": "BUE->COR", "price": 130.0, "category": "travel.flights", "merchant_id": "merch_vuelaya"},
-    {"id": "FLIGHT_COR_145_TRAP", "route": "BUE->COR", "price": 145.0, "category": "travel.flights", "merchant_id": "merch_vuelaya"},
-    {"id": "FLIGHT_COR_300", "route": "BUE->COR", "price": 300.0, "category": "travel.flights", "merchant_id": "merch_vuelaya"},
-    {"id": "FLIGHT_MDZ_180", "route": "BUE->MDZ", "price": 180.0, "category": "travel.flights", "merchant_id": "merch_vuelaya"},
-    {"id": "HOTEL_COR_90", "route": "HOTEL-COR", "price": 90.0, "category": "hospitality", "merchant_id": "merch_vuelaya"},
+    {"id": "FLIGHT_COR_130", "route": "BUE->COR", "price": 130.0, "category": "travel.flights", "merchant_id": "mch_vuelaya"},
+    {"id": "FLIGHT_COR_145_TRAP", "route": "BUE->COR", "price": 145.0, "category": "travel.flights", "merchant_id": "mch_vuelaya"},
+    {"id": "FLIGHT_COR_300", "route": "BUE->COR", "price": 300.0, "category": "travel.flights", "merchant_id": "mch_vuelaya"},
+    {"id": "FLIGHT_MDZ_180", "route": "BUE->MDZ", "price": 180.0, "category": "travel.flights", "merchant_id": "mch_vuelaya"},
+    {"id": "HOTEL_COR_90", "route": "HOTEL-COR", "price": 90.0, "category": "hospitality", "merchant_id": "mch_vuelaya"},
 ]
 
 
@@ -26,7 +26,7 @@ class VuelaYaMerchant:
     via cryptographic mandate verification.
     """
 
-    MERCHANT_ID = "merch_vuelaya"
+    MERCHANT_ID = "mch_vuelaya"
     MERCHANT_NAME = "VuelaYa Travel Agency"
 
     def __init__(self):

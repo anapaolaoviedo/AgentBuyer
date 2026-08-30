@@ -16,7 +16,7 @@ def test_full_pipeline_headless():
         "constraints": {
             "max_amount_per_purchase": 150.0,
             "allowed_categories": ["travel.flights"],
-            "allowed_merchants": ["merch_vuelaya"],
+            "allowed_merchants": ["mch_vuelaya"],
             "max_uses": 3,
             "conditions": [
                 {"type": "price_below", "value": 150.0}

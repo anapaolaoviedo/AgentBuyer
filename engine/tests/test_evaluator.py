@@ -1,5 +1,4 @@
-"""Los 5 casos del contrato (A–E) — todos deben pasar antes de decir
-"engine is ready" y de cambiar el import de engine_mock en api/verify.py.
+"""Los 5 casos del contrato (A–E) — la definición de "engine is ready".
 
 Mandato de referencia: max 150, categoría travel.flights, comercio mch_vuelaya,
 máximo 3 usos, condición price_below 150.

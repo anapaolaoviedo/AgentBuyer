@@ -448,17 +448,8 @@ def api_get_catalog():
     return vuelaya_merchant.get_catalog()
 
 
-@app.get("/merchant/flights")
-def api_get_flights():
-    return get_flights()
-
-
-@app.post("/agent/run")
-def api_run_agent(payload: dict):
-    mandate_id = payload.get("mandate_id")
-    if not mandate_id:
-        raise HTTPException(status_code=422, detail="mandate_id is required")
-    return run_agent(mandate_id)
+# /merchant/flights, /merchant/search y /agent/run viven en sus routers
+# (api/merchant.py, api/agent.py) — una sola dueña por ruta, sin sombras.
 
 
 @app.post("/purchases/execute")
@@ -589,20 +580,8 @@ def api_verify_audit_integrity():
 
 
 
-# Dispute Resolution Endpoints
-@app.post("/disputes/file", response_model=DisputeClaim)
-def api_file_dispute(req: FileDisputeRequest):
-    return dispute_arbiter.file_dispute(
-        attempt_id=req.attempt_id,
-        mandate_id=req.mandate_id,
-        claimant_id=req.claimant_id,
-        reason=req.reason,
-    )
-
-
-@app.get("/disputes", response_model=List[DisputeClaim])
-def api_list_disputes():
-    return dispute_arbiter.list_disputes()
+# Disputas: /disputes/file y /disputes viven en api/disputes.py (resolver
+# nativo del modelo API/React). core/dispute.py sigue sirviendo al flujo adversarial.
 
 
 # Adversarial Suite Runner
@@ -618,11 +597,13 @@ def api_run_adversarial():
 # Include modular routers
 from api.agent import router as agent_router
 from api.audit import router as audit_router
+from api.disputes import router as disputes_router
 from api.escalations import router as escalations_router
 from api.merchant import router as merchant_router
 
 app.include_router(agent_router)
 app.include_router(audit_router)
+app.include_router(disputes_router)
 app.include_router(escalations_router)
 app.include_router(merchant_router)
 

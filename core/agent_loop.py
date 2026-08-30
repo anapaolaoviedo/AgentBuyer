@@ -140,7 +140,10 @@ def _discover_flights(search_fields: dict | None) -> tuple[list[dict], str]:
             ]
             return flights, "web"
     mock_flights = [
-        flight | {"source": "mock", "merchant": "VuelaYa"} for flight in get_flights()
+        flight | {"source": "mock", "merchant": "VuelaYa"}
+        for flight in get_flights()
+        # El catálogo ahora trae también hoteles; este agente compra vuelos.
+        if flight.get("category") == "travel.flights"
     ]
     return mock_flights, "mock"
 
