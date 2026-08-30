@@ -63,7 +63,7 @@ Genera el contrato semántico formal."""
             "max_amount_per_purchase": max_tx,
             "monthly_budget": budget,
             "allowed_categories": ["travel.flights", "travel"],
-            "allowed_merchants": ["merch_vuelaya", "*"],
+            "allowed_merchants": ["mch_vuelaya", "*"],
             "conditions_expression": f"price <= {max_tx} AND destination == '{destino}'" if destino != "ANY" else f"price <= {max_tx}",
             "intent_summary": f"Vuelo con destino {destino} con tope de ${max_tx:.2f} y protección de presupuesto.",
             "chain_of_thought": cot
