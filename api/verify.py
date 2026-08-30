@@ -29,6 +29,7 @@ def _finish(
     verdict: str,
     checks: list[dict],
     human_readable: str,
+    amount: int | float | None = None,
 ) -> dict:
     """Registra toda decisión antes de devolverla al comercio."""
     decided_at = _timestamp()
@@ -39,6 +40,9 @@ def _finish(
             "attempt_id": attempt_id,
             "verdict": verdict,
             "summary": human_readable,
+            # Datos para la revisión humana de escalaciones (api/escalations.py):
+            "amount": amount,
+            "failed_rules": [c["rule"] for c in checks if not c.get("pass")],
         }
     )
     return {
@@ -146,11 +150,13 @@ def verify_purchase(attempt_purchase: dict[str, Any]):
     verdict = engine_result["verdict"]
     checks = security_checks + engine_result["checks"]
 
+    amount = engine_attempt.get("amount")
+    if not isinstance(amount, Real) or isinstance(amount, bool):
+        amount = None
+
     # 5. La actualización se aplica sobre el estado vivo, únicamente al aprobar.
     if verdict == "APPROVE":
-        purchase = attempt_purchase.get("purchase")
-        amount = purchase.get("amount") if isinstance(purchase, dict) else None
-        if not isinstance(amount, Real) or isinstance(amount, bool):
+        if amount is None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="purchase.amount debe ser un número.",
@@ -161,4 +167,4 @@ def verify_purchase(attempt_purchase: dict[str, Any]):
         human_readable = "La compra requiere aprobación humana."
 
     # 4 y 6. El veredicto final es el del engine y combina todos los checks.
-    return _finish(mandate_id, attempt_id, verdict, checks, human_readable)
+    return _finish(mandate_id, attempt_id, verdict, checks, human_readable, amount=amount)
