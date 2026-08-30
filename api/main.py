@@ -280,8 +280,11 @@ def auth_email_start(payload: EmailStartRequest):
     code = str(secrets.randbelow(900000) + 100000)
     _email_otp_store[email_addr] = code
 
+    smtp_user = os.getenv("SMTP_USER", "") or SMTP_USER
+    smtp_pass = os.getenv("SMTP_PASS", "") or SMTP_PASS
+
     sent_via = "memory"
-    if SMTP_USER and SMTP_PASS:
+    if smtp_user and smtp_pass:
         try:
             import smtplib
             from email.mime.text import MIMEText
@@ -292,15 +295,16 @@ def auth_email_start(payload: EmailStartRequest):
                 "utf-8",
             )
             msg["Subject"] = f"Aegis Security OTP: {code}"
-            msg["From"] = f"Saturday Agent <{SMTP_USER}>"
+            msg["From"] = f"Saturday Agent <{smtp_user}>"
             msg["To"] = email_addr
 
             with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-                server.login(SMTP_USER, SMTP_PASS)
-                server.sendmail(SMTP_USER, [email_addr], msg.as_string())
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(smtp_user, [email_addr], msg.as_string())
             sent_via = "smtp"
+            print(f"[Gmail SMTP OTP] Successfully sent OTP code {code} to {email_addr}")
         except Exception as err:
-            print("SMTP send notice:", err)
+            print(f"[Gmail SMTP ERROR] Failed to send OTP to {email_addr}: {err}")
 
     return {
         "ok": True,
