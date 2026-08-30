@@ -1,5 +1,5 @@
-import { FormEvent, useMemo, useState, useEffect } from "react";
-import Saturday from "./Saturday";
+import { FormEvent, useMemo, useState, useEffect, useRef } from "react";
+import Saturday, { type SaturdayExpression } from "./Saturday";
 import { useLivenessVerification } from "../hooks/useLivenessVerification";
 import { useZeroTrustSecurity } from "../hooks/useZeroTrustSecurity";
 
@@ -377,7 +377,6 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
                 Teléfono para SMS OTP:
                 <input value={userPhone} onChange={(e) => { setUserPhone(e.target.value); setSmsVerified(false); setSmsCodeSent(false); setEditingSms(false); }} placeholder="+54 9 11 5829-1039" style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
               </label>
-              </>}
             </div>
 
             <div className={`form-pair security-item security-code-or-payment ${currentStep === 1 && smsCollapsed ? "is-collapsed" : ""}`} style={{ marginTop: "8px" }}>
@@ -417,7 +416,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
                 }}
               >
                 Verificar con Face ID / Huella
-              </button>}
+              </button>
             </div>
           </div>
 
