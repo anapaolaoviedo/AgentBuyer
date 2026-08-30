@@ -1,4 +1,4 @@
-﻿import os
+import os
 import smtplib
 import urllib.parse
 from datetime import datetime, timezone, timedelta
@@ -10,9 +10,9 @@ SMTP_PASS = os.environ.get("SMTP_PASS", "")
 
 def enviar_ticket_confirmacion(correo_destino: str, detalles_reserva: dict) -> dict:
     """
-    Envía el recibo oficial / confirmación de compra de logística comercial
-    al usuario una vez que el agente completa la compra autónoma con veredicto APPROVE.
-    Incluye botón 1-click para Google Calendar y archivo adjunto .ics interactivo.
+    Sends the official receipt / purchase confirmation for the commercial logistics
+    to the user once the agent completes the autonomous purchase with APPROVE verdict.
+    Includes 1-click Google Calendar button and interactive .ics attachment.
     """
     dest = (correo_destino or "").strip()
     if not dest or "@" not in dest:
@@ -32,23 +32,23 @@ def enviar_ticket_confirmacion(correo_destino: str, detalles_reserva: dict) -> d
     fecha_actual = now_utc.strftime("%A, %B %d, %Y")
     hora_actual = now_utc.strftime("%I:%M %p UTC")
 
-    # Programación del evento en calendario (3 días adelante a las 14:00 UTC)
+    # Schedule calendar event (3 days ahead at 14:00 UTC)
     event_start = now_utc + timedelta(days=3)
     event_start = event_start.replace(hour=14, minute=0, second=0, microsecond=0)
     event_end = event_start + timedelta(hours=2)
     start_str = event_start.strftime("%Y%m%dT%H%M%SZ")
     end_str = event_end.strftime("%Y%m%dT%H%M%SZ")
 
-    cal_title = f"✈️ Vuelo: {destino} [{pnr}]"
+    cal_title = f"✈️ Flight: {destino} [{pnr}]"
     cal_details = (
-        f"Reserva confirmada de forma autónoma por Saturday Agent (Aegis Zero-Trust).\n"
-        f"Código de Reserva (PNR): {pnr}\n"
-        f"Proveedor: {proveedor}\n"
-        f"Titular: {pasajero}\n"
-        f"Total Cobrado: ${precio:.2f} {moneda}\n"
-        f"Método de Pago: Scoped Virtual Token ({token_id})\n"
-        f"Sello de Seguridad: Ed25519 & Semantic Firewall Validated.\n\n"
-        f"Check-in online disponible 24h antes del vuelo."
+        f"Reservation confirmed autonomously by Saturday Agent (Aegis Zero-Trust).\n"
+        f"Booking Code (PNR): {pnr}\n"
+        f"Provider: {proveedor}\n"
+        f"Passenger: {pasajero}\n"
+        f"Total Charged: ${precio:.2f} {moneda}\n"
+        f"Payment Method: Scoped Virtual Token ({token_id})\n"
+        f"Security Seal: Ed25519 & Semantic Firewall Validated.\n\n"
+        f"Online check-in available 24h before departure."
     )
     cal_location = f"{destino}"
 
@@ -65,10 +65,10 @@ def enviar_ticket_confirmacion(correo_destino: str, detalles_reserva: dict) -> d
     msg['From'] = f"Saturday Agent <{SMTP_USER}>" if SMTP_USER else "Saturday Agent <aegis@zero-trust.protocol>"
     msg['To'] = dest
 
-    # Plantilla HTML formal estilo eCommerce / Logística de Viajes
+    # Formal HTML template — eCommerce / Travel Logistics style
     html = f"""
     <!DOCTYPE html>
-    <html lang="es">
+    <html lang="en">
     <head>
       <meta charset="utf-8">
       <style>
@@ -235,10 +235,10 @@ def enviar_ticket_confirmacion(correo_destino: str, detalles_reserva: dict) -> d
         <!-- BOTÓN GOOGLE CALENDAR -->
         <div style="text-align: center; margin: 18px 0 22px; padding: 14px; background-color: #1e2638; border-radius: 6px; border: 1px solid #2d3b55;">
           <div style="font-size: 0.82rem; color: #cbd5e1; margin-bottom: 10px;">
-            🗓️ Sincroniza este itinerario directamente con tu agenda:
+            🗓️ Sync this itinerary directly with your calendar:
           </div>
           <a href="{gcal_url}" target="_blank" class="calendar-btn">
-            📅 Agregar a Google Calendar
+            📅 Add to Google Calendar
           </a>
         </div>
 
@@ -321,18 +321,18 @@ def enviar_ticket_confirmacion(correo_destino: str, detalles_reserva: dict) -> d
         <!-- SECCIÓN 3: SELLO CRIPTOGRÁFICO ZERO-TRUST -->
         <div style="background-color: #182230; border: 1px solid #1e3a8a; border-radius: 6px; padding: 12px; margin-top: 16px;">
           <div style="font-size: 0.78rem; font-weight: bold; color: #60a5fa; margin-bottom: 4px;">
-            🛡️ AUDITORÍA DE SEGURIDAD CRIPTOGRÁFICA (ZERO-TRUST)
+            🛡️ CRYPTOGRAPHIC SECURITY AUDIT (ZERO-TRUST)
           </div>
           <div style="font-size: 0.72rem; color: #94a3b8; line-height: 1.4;">
-            • <strong>Firma Digital:</strong> Ed25519 Asymmetric Signature Validated.<br>
-            • <strong>DLP Tokenization:</strong> PAN protegido. Scoped Virtual Token rotado tras liquidación.<br>
-            • <strong>Audit Ledger:</strong> SHA-256 Merkle Block append_entry registrado en ledger inmutable.
+            • <strong>Digital Signature:</strong> Ed25519 Asymmetric Signature Validated.<br>
+            • <strong>DLP Tokenization:</strong> PAN protected. Scoped Virtual Token rotated after settlement.<br>
+            • <strong>Audit Ledger:</strong> SHA-256 Merkle Block append_entry recorded on immutable ledger.
           </div>
         </div>
 
         <div class="footer">
           <strong>Aegis Zero-Trust Autonomous Protocol</strong> &nbsp;|&nbsp; Saturday Agentic Commerce Engine<br>
-          Recibo fiscal y confirmación de logística comercial emitidos de manera autónoma bajo delegación de mandato activo.
+          Fiscal receipt and commercial logistics confirmation issued autonomously under active mandate delegation.
         </div>
 
       </div>
@@ -340,13 +340,13 @@ def enviar_ticket_confirmacion(correo_destino: str, detalles_reserva: dict) -> d
     </html>
     """
 
-    # 1. Adjuntar HTML
+    # 1. Attach HTML body
     msg.attach(MIMEText(html, 'html', 'utf-8'))
 
-    # 2. Adjuntar invitación interactiva iCalendar (.ics) para detección nativa en Gmail
+    # 2. Attach interactive iCalendar (.ics) invitation for native detection in Gmail
     ics_content = f"""BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//Aegis Protocol//Saturday Agent//ES
+PRODID:-//Aegis Protocol//Saturday Agent//EN
 CALSCALE:GREGORIAN
 METHOD:REQUEST
 BEGIN:VEVENT
@@ -354,8 +354,8 @@ UID:aegis-{pnr}-{int(now_utc.timestamp())}@zero-trust.protocol
 DTSTAMP:{now_utc.strftime('%Y%m%dT%H%M%SZ')}
 DTSTART:{start_str}
 DTEND:{end_str}
-SUMMARY:✈️ Vuelo: {destino} [{pnr}]
-DESCRIPTION:Reserva confirmada de forma autónoma por Saturday Agent.\\nPNR: {pnr}\\nTotal: ${precio:.2f} {moneda}\\nSello Zero-Trust Ed25519.
+SUMMARY:✈️ Flight: {destino} [{pnr}]
+DESCRIPTION:Reservation confirmed autonomously by Saturday Agent.\\nPNR: {pnr}\\nTotal: ${precio:.2f} {moneda}\\nZero-Trust Ed25519 Seal.
 LOCATION:{destino}
 STATUS:CONFIRMED
 ORGANIZER;CN=Saturday Agent:mailto:{SMTP_USER or 'saturday.agentbuyer@gmail.com'}
@@ -364,7 +364,7 @@ END:VEVENT
 END:VCALENDAR"""
 
     part_ics = MIMEText(ics_content, 'calendar; method=REQUEST; charset="utf-8"', 'utf-8')
-    part_ics.add_header('Content-Disposition', 'attachment; filename="itinerario-saturday.ics"')
+    part_ics.add_header('Content-Disposition', 'attachment; filename="itinerary-saturday.ics"')
     msg.attach(part_ics)
 
     current_smtp_user = os.environ.get("SMTP_USER", "")
@@ -375,11 +375,11 @@ END:VCALENDAR"""
             with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
                 server.login(current_smtp_user, current_smtp_pass)
                 server.send_message(msg)
-            print(f"[Gmail SMTP] Recibo oficial con Google Calendar enviado exitosamente a {dest}")
-            return {"status": 200, "mensaje": "Recibo oficial enviado con éxito.", "enviado_a": dest}
+            print(f"[Gmail SMTP] Official receipt with Google Calendar sent successfully to {dest}")
+            return {"status": 200, "message": "Official receipt sent successfully.", "sent_to": dest}
         except Exception as e:
-            print(f"Aviso SMTP al enviar recibo a {dest}: {e}")
-            return {"status": 500, "mensaje": f"Error SMTP: {e}", "enviado_a": dest}
+            print(f"SMTP warning sending receipt to {dest}: {e}")
+            return {"status": 500, "message": f"SMTP error: {e}", "sent_to": dest}
 
-    print(f"[Modo Local] Recibo generado para {dest} (PNR: {pnr})")
-    return {"status": 200, "mensaje": "Recibo generado en modo local.", "enviado_a": dest}
+    print(f"[Local Mode] Receipt generated for {dest} (PNR: {pnr})")
+    return {"status": 200, "message": "Receipt generated in local mode.", "sent_to": dest}
