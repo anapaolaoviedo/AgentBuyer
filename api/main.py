@@ -591,10 +591,12 @@ def api_run_adversarial():
 # Include modular routers
 from api.agent import router as agent_router
 from api.audit import router as audit_router
+from api.escalations import router as escalations_router
 from api.merchant import router as merchant_router
 
 app.include_router(agent_router)
 app.include_router(audit_router)
+app.include_router(escalations_router)
 app.include_router(merchant_router)
 
 try:

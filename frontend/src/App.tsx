@@ -34,10 +34,18 @@ type MandateRecord = {
   live_state: LiveState;
 };
 
-type Flight = { id: string; route: string; price: number; category: string; merchant_id: string };
+type Flight = {
+  id: string; route: string; price: number; category: string; merchant_id: string;
+  // Presentes cuando la oferta viene de la búsqueda web real:
+  merchant?: string; details?: string; url?: string; source?: string;
+};
+type Offer = { merchant: string; price: number; currency: string; details: string; url: string };
+type SearchFields = { origin: string; destination: string; departure_date: string };
 type Check = { rule: string; pass: boolean; detail: string };
 type Verification = { verdict: "APPROVE" | "ESCALATE" | "REJECT"; checks: Check[]; human_readable?: string };
 type AgentRun = {
+  attempt_id?: string;
+  discovery_source?: "web" | "mock";
   verification?: Verification;
   verdict?: Verification["verdict"];
   checks?: Check[];
@@ -55,7 +63,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
     headers: { "Content-Type": "application/json", ...options?.headers },
   });
-  if (!response.ok) throw new Error(`El sistema respondió ${response.status}.`);
+  if (!response.ok) {
+    // El backend explica sus 404/409/422 en `detail`; se muestra tal cual.
+    let message = `El sistema respondió ${response.status}.`;
+    try {
+      const body = (await response.json()) as { detail?: string };
+      if (typeof body.detail === "string" && body.detail) message = body.detail;
+    } catch { /* cuerpo no-JSON: se conserva el mensaje genérico */ }
+    throw new Error(message);
+  }
   return response.json() as Promise<T>;
 }
 
@@ -84,12 +100,17 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
   const [pendingVerification, setPendingVerification] = useState<Verification | null>(null);
   const [activity, setActivity] = useState<AgentRun | null>(null);
   const [saturdayState, setSaturdayState] = useState<SaturdayState>("idle");
-  const [busy, setBusy] = useState<"loading" | "running" | "revoking" | null>("loading");
+  const [busy, setBusy] = useState<"loading" | "running" | "revoking" | "searching" | "reviewing" | null>("loading");
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<DecisionPhase>("idle");
   const [scannedFlight, setScannedFlight] = useState<number | null>(null);
   const [chosenFlightId, setChosenFlightId] = useState<string | null>(null);
   const [revealedChecks, setRevealedChecks] = useState(0);
+  // Búsqueda web real (POST /merchant/search) y revisión humana de escalaciones.
+  const [searchFields, setSearchFields] = useState<SearchFields>({ origin: "", destination: "", departure_date: "" });
+  const [discoverySource, setDiscoverySource] = useState<"mock" | "web">("mock");
+  const [searchNote, setSearchNote] = useState<string | null>(null);
+  const [escalatedAttemptId, setEscalatedAttemptId] = useState<string | null>(null);
 
   const constraints = mandate?.mandate.constraints ?? {};
   const priceLimit = useMemo(
@@ -100,9 +121,11 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
     constraints.max_amount_per_purchase ?? Number.POSITIVE_INFINITY,
     priceLimit ?? Number.POSITIVE_INFINITY,
   );
+  // Formulario completo => "Correr agente" busca ofertas reales y decide, en un solo paso.
+  const fieldsComplete = Boolean(searchFields.origin && searchFields.destination && searchFields.departure_date);
   const phaseCopy: Record<DecisionPhase, string> = {
     idle: "",
-    discovering: "Descubriendo vuelos…",
+    discovering: fieldsComplete ? "Buscando ofertas reales en la web…" : "Descubriendo vuelos…",
     evaluating: "Evaluando límites…",
     choosing: "Eligiendo la mejor opción…",
     verifying: "Verificando con el guardián…",
@@ -128,6 +151,71 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
 
   useEffect(() => { void loadMission(); }, [loadMission]);
 
+  async function searchWeb(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy("searching");
+    setError(null);
+    setSearchNote(null);
+    try {
+      const offers = await request<Offer[]>("/merchant/search", {
+        method: "POST",
+        body: JSON.stringify({ category: "flights", fields: searchFields }),
+      });
+      if (!offers.length) {
+        setSearchNote("La búsqueda no devolvió ofertas — se mantiene el catálogo demo.");
+        return;
+      }
+      setFlights(offers.map((offer, index) => ({
+        id: `web_${index}`,
+        route: `${searchFields.origin} → ${searchFields.destination}`,
+        price: offer.price,
+        category: "travel.flights",
+        merchant_id: "",
+        merchant: offer.merchant,
+        details: offer.details,
+        url: offer.url,
+        source: "web",
+      })));
+      setDiscoverySource("web");
+      setVerification(null);
+      setActivity(null);
+      setChosenFlightId(null);
+      setEscalatedAttemptId(null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "No hay conexión con el sistema.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function resetToCatalog() {
+    setDiscoverySource("mock");
+    setSearchNote(null);
+    void loadMission(true);
+  }
+
+  async function reviewEscalation(decision: "approve" | "decline") {
+    if (!escalatedAttemptId) return;
+    setBusy("reviewing");
+    setError(null);
+    try {
+      const result = await request<Verification>(`/mandates/${mandateId}/approve_escalation`, {
+        method: "POST",
+        body: JSON.stringify({ purchase_attempt_id: escalatedAttemptId, decision }),
+      });
+      // Misma forma que /verify: se renderiza como cualquier otro veredicto.
+      setVerification(result);
+      setSaturdayState(verdictState(result.verdict));
+      setEscalatedAttemptId(null);
+      const mandateData = await request<MandateRecord>(`/mandates/${mandateId}`);
+      setMandate(mandateData);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "No hay conexión con el sistema.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function runAgent() {
     setBusy("running");
     setError(null);
@@ -137,16 +225,31 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
     setActivity(null);
     setChosenFlightId(null);
     setRevealedChecks(0);
+    setEscalatedAttemptId(null);
+    setSearchNote(null);
     setSaturdayState("thinking");
 
     try {
-      // Se inicia la operación real al comienzo; la UI solo demora su presentación.
+      // UNA sola acción: con el formulario lleno, /agent/run busca ofertas
+      // REALES en la web, elige y verifica; sin formulario usa el catálogo demo.
       const agentRequest = request<AgentRun>("/agent/run", {
         method: "POST",
-        body: JSON.stringify({ mandate_id: mandateId }),
+        body: JSON.stringify({
+          mandate_id: mandateId,
+          ...(fieldsComplete ? { search_fields: searchFields } : {}),
+        }),
       });
       setPhase("discovering");
-      for (let index = 0; index < flights.length; index += 1) {
+      // La elección nunca se inventa: esperamos lo que devolvió /agent/run y
+      // recién entonces se anima el escaneo sobre la lista REAL que vio el agente.
+      const run = await agentRequest;
+      if (run.flights_seen?.length) setFlights(run.flights_seen);
+      if (run.discovery_source) setDiscoverySource(run.discovery_source);
+      if (fieldsComplete && run.discovery_source === "mock") {
+        setSearchNote("La búsqueda web no devolvió ofertas; Saturday usó el catálogo demo.");
+      }
+      const scanCount = run.flights_seen?.length ?? flights.length;
+      for (let index = 0; index < scanCount; index += 1) {
         setScannedFlight(index);
         await wait(150);
       }
@@ -155,8 +258,6 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
       setPhase("evaluating");
       await wait(850);
 
-      // La elección nunca se inventa: esperamos el vuelo devuelto por /agent/run.
-      const run = await agentRequest;
       const result: Verification = run.verification ?? {
         verdict: run.verdict ?? "REJECT",
         checks: run.checks ?? [],
@@ -175,6 +276,8 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
       setActivity(run);
       setVerification(result);
       setPendingVerification(null);
+      // Una escalación queda pendiente de la decisión humana (approve/decline).
+      setEscalatedAttemptId(result.verdict === "ESCALATE" ? run.attempt_id ?? null : null);
       setSaturdayState(verdictState(result.verdict));
       const mandateData = await request<MandateRecord>(`/mandates/${mandateId}`);
       setMandate(mandateData);
@@ -201,6 +304,7 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
       setActivity(null);
       setChosenFlightId(null);
       setRevealedChecks(0);
+      setEscalatedAttemptId(null);
       setPhase("idle");
       setSaturdayState("reject");
     } catch (caught) {
@@ -263,7 +367,24 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
 
         <section className="control-grid">
           <aside className="side-panel flights-panel">
-            <div className="panel-title"><span>VUELOS DESCUBIERTOS</span><small>{flights.length} EN CATÁLOGO</small></div>
+            <div className="panel-title"><span>VUELOS DESCUBIERTOS</span><small>{flights.length} {discoverySource === "web" ? "DE LA WEB (REAL)" : "EN CATÁLOGO"}</small></div>
+            <form className="web-search-form" onSubmit={(event) => void searchWeb(event)}>
+              <div className="web-search-pair">
+                <input placeholder="Origen (Mexico City)" value={searchFields.origin} onChange={(e) => setSearchFields({ ...searchFields, origin: e.target.value })} required aria-label="Origen" />
+                <input placeholder="Destino (Cancun)" value={searchFields.destination} onChange={(e) => setSearchFields({ ...searchFields, destination: e.target.value })} required aria-label="Destino" />
+              </div>
+              <input type="date" value={searchFields.departure_date} onChange={(e) => setSearchFields({ ...searchFields, departure_date: e.target.value })} required aria-label="Fecha de salida" />
+              <button className="web-search-button" disabled={busy !== null} type="submit">
+                {busy === "searching" ? "BUSCANDO EN LA WEB…" : "👀 VISTA PREVIA DE OFERTAS"}
+              </button>
+              {discoverySource === "web" && <button className="catalog-reset" onClick={resetToCatalog} type="button">← volver al catálogo demo</button>}
+            </form>
+            <p className="search-hint">
+              {fieldsComplete
+                ? "Listo: CORRER AGENTE buscará en la web, elegirá y verificará en un solo paso. La vista previa es opcional."
+                : "Llena origen, destino y fecha para que Saturday busque ofertas reales — o corre el agente sin llenar nada para usar el catálogo demo."}
+            </p>
+            {searchNote && <p className="search-note">{searchNote}</p>}
             <div className="flight-list">
               {flights.map((flight, index) => {
                 const isEvaluating = phase === "evaluating" || phase === "choosing" || phase === "verifying";
@@ -277,7 +398,7 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
                     animate={scannedFlight === index ? { scale: [1, 1.035, 1] } : { scale: 1 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <div><p>{flight.route}</p><span>{flight.id}</span>{isEvaluating && <em>{passesLimit ? "dentro del límite" : `excede ${amount(evaluationLimit, constraints.currency)}`}</em>}{isChosen && <em className="chosen-label">elegido por Saturday</em>}</div>
+                    <div><p>{flight.route}</p><span title={flight.details}>{flight.merchant ?? flight.id}</span>{isEvaluating && <em>{passesLimit ? "dentro del límite" : `excede ${amount(evaluationLimit, constraints.currency)}`}</em>}{isChosen && <em className="chosen-label">elegido por Saturday</em>}</div>
                     <strong>{amount(flight.price)}</strong>
                   </motion.article>
                 );
@@ -314,6 +435,19 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
                   ))}
                   </AnimatePresence>
                 </div>
+                {verification?.verdict === "ESCALATE" && escalatedAttemptId && phase === "idle" && (
+                  <div className="human-review">
+                    <p>⚠ Escalada — nunca se aprueba en silencio. Decide tú:</p>
+                    <div className="human-review-actions">
+                      <button className="human-approve" disabled={busy !== null} onClick={() => void reviewEscalation("approve")} type="button">
+                        {busy === "reviewing" ? "REGISTRANDO…" : "✓ APROBAR"}
+                      </button>
+                      <button className="human-decline" disabled={busy !== null} onClick={() => void reviewEscalation("decline")} type="button">
+                        ✕ RECHAZAR
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {verification && phase === "idle" && <div className="result-links">
                   {verification.verdict === "APPROVE" && <button onClick={() => onNavigate("account")} type="button">✓ Compra registrada — verla en Mis compras</button>}
                   <button onClick={() => onNavigate("audit")} type="button">Este intento quedó en el registro — ver en Auditoría →</button>

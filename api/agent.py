@@ -16,4 +16,9 @@ def run_buyer_agent(request: dict[str, Any]):
     mandate_id = request.get("mandate_id")
     if not isinstance(mandate_id, str) or not mandate_id.strip():
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="El campo mandate_id es obligatorio y debe ser un texto no vacío.")
-    return run_agent(mandate_id)
+    # Opcional: con search_fields el agente descubre ofertas reales en la web
+    # ({origin, destination, departure_date, ...}); sin él usa el catálogo demo.
+    search_fields = request.get("search_fields")
+    if search_fields is not None and not isinstance(search_fields, dict):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="search_fields debe ser un objeto.")
+    return run_agent(mandate_id, search_fields)

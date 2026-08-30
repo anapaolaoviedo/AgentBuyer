@@ -15,6 +15,8 @@ _EVENT_TYPES = {
     "revocation",
     "purchase_completed",
     "agent_run",
+    "human_override_approved",
+    "human_override_declined",
 }
 
 # Se agrega únicamente con append_entry; no existe una operación de borrado.
