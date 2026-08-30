@@ -1,17 +1,19 @@
 import { motion } from "framer-motion";
 
 export type SaturdayState = "idle" | "thinking" | "approve" | "escalate" | "reject";
+export type SaturdayExpression = "covering" | "happy" | "nodding" | "ready";
 
 type SaturdayProps = {
   state: SaturdayState;
+  expression?: SaturdayExpression;
 };
 
 const stateCopy: Record<SaturdayState, string> = {
-  idle: "SATURDAY · EN ESPERA",
-  thinking: "SATURDAY · ANALIZANDO",
-  approve: "SATURDAY · AUTORIZADA",
-  escalate: "SATURDAY · REQUIERE HUMANO",
-  reject: "SATURDAY · BLOQUEADA",
+  idle: "SATURDAY · STANDING BY",
+  thinking: "SATURDAY · ANALYZING",
+  approve: "SATURDAY · AUTHORIZED",
+  escalate: "SATURDAY · NEEDS HUMAN",
+  reject: "SATURDAY · BLOCKED",
 };
 
 const palette: Record<SaturdayState, string> = {
@@ -22,9 +24,10 @@ const palette: Record<SaturdayState, string> = {
   reject: "#FF5C5C",
 };
 
-export default function Saturday({ state }: SaturdayProps) {
+export default function Saturday({ state, expression }: SaturdayProps) {
   const isFrozen = state === "reject";
   const isThinking = state === "thinking";
+  const isCovering = expression === "covering";
 
   const cardMotion = {
     idle: { y: [0, -10, 0], rotate: 0, scale: 1 },
@@ -41,6 +44,23 @@ export default function Saturday({ state }: SaturdayProps) {
     escalate: { duration: 0.8, repeat: Infinity, ease: "easeInOut" },
     reject: { duration: 0.45, ease: "easeOut" },
   };
+  const cardAnimation = expression === "nodding"
+    ? { y: [0, 7, 0], rotate: 0, scale: 1 }
+    : cardMotion[state];
+  const cardTransition = expression === "nodding"
+    ? { duration: 0.5, ease: "easeInOut" }
+    : transition[state];
+  const leftEyeAnimation = isCovering
+    ? { opacity: 1, scaleY: 0.08 }
+    : expression === "happy"
+      ? { scaleY: [1, 0.08, 1], rotate: [0, -8, 0] }
+      : isThinking ? { x: [-4, 4, -4], scaleY: [1, 0.92, 1] } : { scaleY: [1, 0.08, 1] };
+  const rightEyeAnimation = isCovering
+    ? { opacity: 1, scaleY: 0.08 }
+    : isThinking ? { x: [4, -4, 4], scaleY: [1, 0.92, 1] } : { scaleY: [1, 0.08, 1] };
+  const eyeTransition = expression === "happy"
+    ? { duration: 0.5, ease: "easeInOut" }
+    : isThinking ? { duration: 0.8, repeat: Infinity } : { duration: 4.2, repeat: Infinity, repeatDelay: 1.8 };
 
   return (
     <div className={`saturday-wrap saturday-${state}`} aria-label={`Saturday: ${stateCopy[state]}`}>
@@ -52,8 +72,8 @@ export default function Saturday({ state }: SaturdayProps) {
       />
       <motion.article
         className="saturday-card"
-        animate={cardMotion[state]}
-        transition={transition[state]}
+        animate={cardAnimation}
+        transition={cardTransition}
         style={{ "--state-glow": palette[state] } as React.CSSProperties}
       >
         <div className="card-topline">
@@ -64,20 +84,20 @@ export default function Saturday({ state }: SaturdayProps) {
           <span className="card-status">{stateCopy[state]}</span>
         </div>
 
-        <div className="face">
+        <div className={`face ${expression ? `face-${expression}` : ""}`}>
           {state === "escalate" && <span className="brow brow-left" />}
           <motion.span
             className="eye"
-            animate={isThinking ? { x: [-4, 4, -4], scaleY: [1, 0.92, 1] } : { scaleY: [1, 0.08, 1] }}
-            transition={isThinking ? { duration: 0.8, repeat: Infinity } : { duration: 4.2, repeat: Infinity, repeatDelay: 1.8 }}
+            animate={leftEyeAnimation}
+            transition={eyeTransition}
           />
           <motion.span
             className="eye"
-            animate={isThinking ? { x: [4, -4, 4], scaleY: [1, 0.92, 1] } : { scaleY: [1, 0.08, 1] }}
-            transition={isThinking ? { duration: 0.8, repeat: Infinity } : { duration: 4.2, repeat: Infinity, repeatDelay: 1.8 }}
+            animate={rightEyeAnimation}
+            transition={eyeTransition}
           />
           {state === "escalate" && <span className="brow brow-right" />}
-          <span className={`mouth mouth-${state}`} />
+          <span className={`mouth mouth-${state} ${expression === "happy" || expression === "ready" ? "mouth-happy" : ""}`} />
         </div>
 
         <div className="card-bottom">

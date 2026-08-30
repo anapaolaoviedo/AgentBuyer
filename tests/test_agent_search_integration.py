@@ -77,7 +77,8 @@ def test_agent_run_uses_web_offers_when_search_fields_present(client, monkeypatc
     assert result["attempt"]["purchase"]["metadata"]["source"] == "web"
 
 
-def test_agent_run_falls_back_to_mock_when_search_fails(client, monkeypatch):
+def test_agent_run_reports_no_offers_when_search_fails(client, monkeypatch):
+    """Sin catálogo demo de respaldo: si la búsqueda falla, NO se inventa nada."""
     def broken(prompt):
         raise RuntimeError("sin red")
 
@@ -88,13 +89,31 @@ def test_agent_run_falls_back_to_mock_when_search_fails(client, monkeypatch):
         "/agent/run", json={"mandate_id": "mnd_web_001", "search_fields": SEARCH_FIELDS}
     ).json()
 
-    assert result["discovery_source"] == "mock"
-    assert result["selected_flight"]["merchant_id"] == "mch_vuelaya"
-    assert result["purchase_completed"] is True
+    assert result["no_offers"] is True
+    assert result["selected_flight"] is None
+    assert result["flights_seen"] == []
+    assert result["purchase_completed"] is False
 
 
-def test_agent_run_without_search_fields_keeps_old_behavior(client):
+def test_agent_run_without_search_fields_reports_no_offers(client):
+    """Sin campos de búsqueda (ni en el request ni en el mandato) no hay red
+    que consultar → no hay vuelos ni intento, nunca datos falsos."""
     client.post("/mandates", json=web_mandate(["mch_vuelaya"]))
     result = client.post("/agent/run", json={"mandate_id": "mnd_web_001"}).json()
-    assert result["discovery_source"] == "mock"
-    assert result["selected_flight"]["merchant_id"] == "mch_vuelaya"
+    assert result["no_offers"] is True
+    assert result["selected_flight"] is None
+    assert result["purchase_completed"] is False
+
+
+def test_agent_run_uses_mandate_stored_search_fields(client, monkeypatch):
+    """Si el request no trae search_fields, se usan los guardados en el mandato."""
+    monkeypatch.setattr(merchant_search, "_call_web_search", lambda p: json.dumps(WEB_OFFERS))
+    mandate = web_mandate(["mch_despegar", "mch_kayak"])
+    mandate["search_fields"] = SEARCH_FIELDS
+    client.post("/mandates", json=mandate)
+
+    result = client.post("/agent/run", json={"mandate_id": "mnd_web_001"}).json()
+
+    assert result["discovery_source"] == "web"
+    assert result["selected_flight"]["merchant_id"] == "mch_kayak"
+    assert result["purchase_completed"] is True

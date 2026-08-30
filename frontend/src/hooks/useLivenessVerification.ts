@@ -89,7 +89,7 @@ export function useLivenessVerification() {
     setLivenessState((prev) => ({ ...prev, error: null }));
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      const err = "Tu navegador no soporta captura de video WebRTC (getUserMedia).";
+      const err = "Your browser doesn't support WebRTC video capture (getUserMedia).";
       setLivenessState((prev) => ({ ...prev, error: err }));
       throw new Error(err);
     }
@@ -135,14 +135,14 @@ export function useLivenessVerification() {
       return stream;
     } catch (err: any) {
       stopCamera();
-      let userFriendlyError = "Error al inicializar el sensor óptico.";
+      let userFriendlyError = "Error initializing the optical sensor.";
 
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-        userFriendlyError = "Permiso de cámara denegado. Permite el acceso en la barra del navegador.";
+        userFriendlyError = "Camera permission denied. Allow access in the browser bar.";
       } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
-        userFriendlyError = "No se detectó ninguna cámara web instalada en tu dispositivo.";
+        userFriendlyError = "No webcam detected on your device.";
       } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
-        userFriendlyError = "La cámara web está siendo utilizada por otra aplicación en tu sistema.";
+        userFriendlyError = "The webcam is being used by another application on your system.";
       }
 
       setLivenessState((prev) => ({
@@ -165,7 +165,7 @@ export function useLivenessVerification() {
 
     const video = videoRef.current;
     if (!video || video.readyState < 2) {
-      const err = "El video de la cámara no está listo para la captura de prueba de vida.";
+      const err = "The camera video is not ready for the liveness capture.";
       setLivenessState((prev) => ({ ...prev, isVerifying: false, error: err }));
       throw new Error(err);
     }
@@ -179,7 +179,7 @@ export function useLivenessVerification() {
       canvas.height = height;
 
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      if (!ctx) throw new Error("No se pudo instanciar el contexto gráfico 2D.");
+      if (!ctx) throw new Error("Couldn't create the 2D graphics context.");
 
       // Dibujar frame actual
       ctx.drawImage(video, 0, 0, width, height);
@@ -221,7 +221,7 @@ export function useLivenessVerification() {
           ...prev,
           isVerifying: false,
           isLiveFaceVerified: false,
-          error: "Cámara tapada o poca luz. Destapa el lente y centra tu rostro para verificar.",
+          error: "Camera covered or low light. Uncover the lens and center your face to verify.",
         }));
         throw new Error(securityError);
       }
@@ -290,7 +290,7 @@ export function useLivenessVerification() {
       console.warn("Endpoint OTP fallback:", err);
       const fallbackResponse: OtpSendResponse = {
         success: true,
-        message: "Código SMS OTP enviado satisfactoriamente.",
+        message: "SMS OTP code sent successfully.",
         phone,
         requestId: `req_${Date.now().toString(36)}`,
       };
@@ -307,7 +307,7 @@ export function useLivenessVerification() {
 
     const sanitized = code.trim();
     if (!/^\d{6}$/.test(sanitized)) {
-      const err = "El código SMS debe tener exactamente 6 dígitos numéricos.";
+      const err = "The SMS code must be exactly 6 digits.";
       setSmsState((prev) => ({ ...prev, isVerifying: false, error: err }));
       throw new Error(err);
     }
@@ -321,7 +321,7 @@ export function useLivenessVerification() {
 
       if (!response.ok) {
         if (response.status === 401 || response.status === 400) {
-          throw new Error("401 Unauthorized: Código SMS OTP inválido o expirado.");
+          throw new Error("401 Unauthorized: Invalid or expired SMS OTP code.");
         }
         throw new Error(`Error en servidor OTP: HTTP ${response.status}`);
       }
@@ -339,7 +339,7 @@ export function useLivenessVerification() {
         ...prev,
         isVerifying: false,
         isSmsVerified: false,
-        error: err.message || "Código de verificación incorrecto o expirado.",
+        error: err.message || "Incorrect SMS code.",
       }));
       throw err;
     }

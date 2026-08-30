@@ -18,20 +18,20 @@ type DisputeClaim = {
 };
 
 function formatDate(timestamp: string) {
-  return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" }).format(new Date(timestamp));
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(timestamp));
 }
 
 function amount(value: number, currency = "USD") {
-  return new Intl.NumberFormat("es-MX", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
 }
 
 // Traduce el veredicto forense del árbitro a lenguaje para el titular.
 function liableCopy(party?: string): { label: string; tone: "human" | "protected" } {
   switch (party) {
-    case "MERCHANT": return { label: "Comercio responsable", tone: "protected" };
-    case "FRAUDSTER": return { label: "Fraude — titular protegido", tone: "protected" };
-    case "AGENT": return { label: "Agente responsable", tone: "protected" };
-    default: return { label: "Cargo válido — titular responsable", tone: "human" };
+    case "MERCHANT": return { label: "Merchant liable", tone: "protected" };
+    case "FRAUDSTER": return { label: "Fraud — cardholder protected", tone: "protected" };
+    case "AGENT": return { label: "Agent liable", tone: "protected" };
+    default: return { label: "Valid charge — cardholder liable", tone: "human" };
   }
 }
 
@@ -60,11 +60,11 @@ export default function AccountView({ mandateId }: { mandateId: string }) {
         fetch(`${API_BASE}/audit/${mandateId}`),
         fetch(`${API_BASE}/mandates/${mandateId}`),
       ]);
-      if (!trailResponse.ok || !mandateResponse.ok) throw new Error("No fue posible actualizar tu información.");
+      if (!trailResponse.ok || !mandateResponse.ok) throw new Error("Couldn't refresh your information.");
       setEvents(await trailResponse.json() as AuditEvent[]);
       setMandate(await mandateResponse.json() as MandateRecord);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "No hay conexión con el sistema.");
+      setError(caught instanceof Error ? caught.message : "No connection to the system.");
     } finally {
       setLoading(false);
     }
@@ -85,11 +85,11 @@ export default function AccountView({ mandateId }: { mandateId: string }) {
           attempt_id: attemptId,
           mandate_id: mandateId,
           claimant_id: claimantId,
-          reason: "No reconozco este cargo — el titular niega haberlo autorizado.",
+          reason: "I don't recognize this charge — the cardholder denies authorizing it.",
         }),
       });
       if (!response.ok) {
-        let message = `El sistema respondió ${response.status}.`;
+        let message = `The system responded ${response.status}.`;
         try { const body = await response.json() as { detail?: string }; if (body.detail) message = body.detail; } catch { /* no-json */ }
         throw new Error(message);
       }
@@ -97,13 +97,13 @@ export default function AccountView({ mandateId }: { mandateId: string }) {
       // El árbitro deja un evento en el trail; refrescamos para que se vea.
       void loadAccount();
     } catch (caught) {
-      setDisputeError(caught instanceof Error ? caught.message : "No se pudo abrir la disputa.");
+      setDisputeError(caught instanceof Error ? caught.message : "Couldn't file the dispute.");
     } finally {
       setDisputingId(null);
     }
   }
 
-  const status = mandate?.live_state.status === "active" ? "ACTIVO" : mandate?.live_state.status === "revoked" ? "REVOCADO" : "CARGANDO";
+  const status = mandate?.live_state.status === "active" ? "ACTIVE" : mandate?.live_state.status === "revoked" ? "REVOKED" : "LOADING";
   const verdictCounts = events.reduce((counts, event) => {
     if (event.verdict === "APPROVE") counts.approve += 1;
     if (event.verdict === "ESCALATE") counts.escalate += 1;
@@ -116,37 +116,37 @@ export default function AccountView({ mandateId }: { mandateId: string }) {
   return (
     <main className="reading-shell">
       <section className="reading-page">
-        <header className="reading-header"><div><p className="mission-kicker">MI CUENTA / TU HISTORIAL</p><h1>Lo que Saturday compró por ti</h1><p>Revisa con calma cada decisión tomada dentro de tu permiso.</p></div><button className="refresh-button" onClick={() => void loadAccount()} disabled={loading} type="button">{loading ? "ACTUALIZANDO…" : "↻ ACTUALIZAR"}</button></header>
-        {error && <div className="connection-error" role="alert"><strong>No hay conexión con el sistema.</strong> {error}</div>}
+        <header className="reading-header"><div><p className="mission-kicker">MY ACCOUNT / YOUR HISTORY</p><h1>What Saturday bought for you</h1><p>Review every decision made within your permission, at your own pace.</p></div><button className="refresh-button" onClick={() => void loadAccount()} disabled={loading} type="button">{loading ? "REFRESHING…" : "↻ REFRESH"}</button></header>
+        {error && <div className="connection-error" role="alert"><strong>No connection to the system.</strong> {error}</div>}
 
         {/* Veredicto de la disputa: el trail auditable resuelve quién tiene razón. */}
         {dispute && (
           <div className={`dispute-card dispute-${liable.tone}`} role="status">
             <div className="dispute-card-head">
-              <span className="dispute-eyebrow">RESOLUCIÓN DE DISPUTA · {dispute.dispute_id}</span>
-              <button className="dispute-close" onClick={() => setDispute(null)} type="button" aria-label="Cerrar">✕</button>
+              <span className="dispute-eyebrow">DISPUTE RESOLUTION · {dispute.dispute_id}</span>
+              <button className="dispute-close" onClick={() => setDispute(null)} type="button" aria-label="Close">✕</button>
             </div>
             <h2>{liable.label}</h2>
             <div className="dispute-badges">
               <span className={`dispute-badge ${dispute.refund_issued ? "refund-yes" : "refund-no"}`}>
-                {dispute.refund_issued ? "💸 Reembolso emitido" : "🚫 Sin reembolso"}
+                {dispute.refund_issued ? "💸 Refund issued" : "🚫 No refund"}
               </span>
               {dispute.verdict && <span className="dispute-badge verdict-code">{dispute.verdict}</span>}
             </div>
-            {dispute.explanation && <p className="dispute-explanation">{dispute.explanation}</p>}
-            <p className="dispute-foot">Resuelto por el árbitro sobre la evidencia criptográfica del registro append-only.</p>
+            {dispute.explanation && <p className="dispute-explanation">{localizedText(dispute.explanation)}</p>}
+            <p className="dispute-foot">Resolved by the arbiter over the append-only ledger's cryptographic evidence.</p>
           </div>
         )}
         {disputeError && <div className="connection-error" role="alert">{disputeError}</div>}
 
-        <div className="verdict-summary" aria-label="Resumen de decisiones"><span className="summary-approve">{verdictCounts.approve} aprobadas</span><span className="summary-escalate">{verdictCounts.escalate} requieren aprobación</span><span className="summary-reject">{verdictCounts.reject} rechazadas</span></div>
+        <div className="verdict-summary" aria-label="Decision summary"><span className="summary-approve">{verdictCounts.approve} approved</span><span className="summary-escalate">{verdictCounts.escalate} need approval</span><span className="summary-reject">{verdictCounts.reject} rejected</span></div>
         <section className="account-summary">
-          <div><span>ESTADO DEL PERMISO</span><b className={`account-status account-${status.toLowerCase()}`}>{status}</b></div>
-          <div><span>GASTADO HASTA AHORA</span><strong>{amount(mandate?.live_state.amount_spent ?? 0, mandate?.mandate.constraints?.currency)}</strong></div>
-          <div><span>COMPRAS USADAS</span><strong>{mandate ? `${mandate.live_state.uses_count}/${mandate.mandate.constraints?.max_uses ?? "—"}` : "—"}</strong></div>
+          <div><span>PERMISSION STATUS</span><b className={`account-status account-${status.toLowerCase()}`}>{status}</b></div>
+          <div><span>SPENT SO FAR</span><strong>{amount(mandate?.live_state.amount_spent ?? 0, mandate?.mandate.constraints?.currency)}</strong></div>
+          <div><span>PURCHASES USED</span><strong>{mandate ? `${mandate.live_state.uses_count}/${mandate.mandate.constraints?.max_uses ?? "—"}` : "—"}</strong></div>
         </section>
-        <section className="timeline-panel"><div className="panel-title"><span>DECISIONES DE SATURDAY</span><small>{events.length} EVENTOS</small></div>
-          {loading ? <p className="empty-copy">Cargando tu actividad…</p> : events.length ? <div className="timeline">{events.map((event) => (
+        <section className="timeline-panel"><div className="panel-title"><span>SATURDAY'S DECISIONS</span><small>{events.length} EVENTS</small></div>
+          {loading ? <p className="empty-copy">Loading your activity…</p> : events.length ? <div className="timeline">{events.map((event) => (
             <article className="timeline-event" key={event.event_id}>
               <div className={`timeline-dot verdict-dot-${event.verdict?.toLowerCase() ?? "neutral"}`} />
               <div>
@@ -154,12 +154,12 @@ export default function AccountView({ mandateId }: { mandateId: string }) {
                 <p>{localizedText(event.summary)}</p>
                 {isDisputable(event) && (
                   <button className="dispute-button" disabled={disputingId !== null} onClick={() => void fileDispute(event.attempt_id!)} type="button">
-                    {disputingId === event.attempt_id ? "RESOLVIENDO DISPUTA…" : "⚖ No reconozco este cargo — disputar"}
+                    {disputingId === event.attempt_id ? "RESOLVING DISPUTE…" : "⚖ I don't recognize this charge — dispute"}
                   </button>
                 )}
               </div>
             </article>
-          ))}</div> : <p className="empty-copy">Aún no hay actividad — corre a Saturday para empezar.</p>}
+          ))}</div> : <p className="empty-copy">No activity yet — run Saturday to get started.</p>}
         </section>
       </section>
     </main>
