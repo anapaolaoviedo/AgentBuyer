@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { auditTypeLabel, localizedText, verdictLabel } from "../lib/presentation";
 
 const API_BASE = "http://127.0.0.1:8000";
 
@@ -51,14 +52,14 @@ export default function AccountView({ mandateId }: { mandateId: string }) {
       <section className="reading-page">
         <header className="reading-header"><div><p className="mission-kicker">MI CUENTA / TU HISTORIAL</p><h1>Lo que Saturday compró por ti</h1><p>Revisa con calma cada decisión tomada dentro de tu permiso.</p></div><button className="refresh-button" onClick={() => void loadAccount()} disabled={loading} type="button">{loading ? "ACTUALIZANDO…" : "↻ ACTUALIZAR"}</button></header>
         {error && <div className="connection-error" role="alert"><strong>No hay conexión con el sistema.</strong> {error}</div>}
-        <div className="verdict-summary" aria-label="Resumen de decisiones"><span className="summary-approve">{verdictCounts.approve} aprobadas</span><span className="summary-escalate">{verdictCounts.escalate} escaladas</span><span className="summary-reject">{verdictCounts.reject} bloqueadas</span></div>
+        <div className="verdict-summary" aria-label="Resumen de decisiones"><span className="summary-approve">{verdictCounts.approve} aprobadas</span><span className="summary-escalate">{verdictCounts.escalate} requieren aprobación</span><span className="summary-reject">{verdictCounts.reject} rechazadas</span></div>
         <section className="account-summary">
           <div><span>ESTADO DEL PERMISO</span><b className={`account-status account-${status.toLowerCase()}`}>{status}</b></div>
           <div><span>GASTADO HASTA AHORA</span><strong>{amount(mandate?.live_state.amount_spent ?? 0, mandate?.mandate.constraints?.currency)}</strong></div>
           <div><span>COMPRAS USADAS</span><strong>{mandate ? `${mandate.live_state.uses_count}/${mandate.mandate.constraints?.max_uses ?? "—"}` : "—"}</strong></div>
         </section>
         <section className="timeline-panel"><div className="panel-title"><span>DECISIONES DE SATURDAY</span><small>{events.length} EVENTOS</small></div>
-          {loading ? <p className="empty-copy">Cargando tu actividad…</p> : events.length ? <div className="timeline">{events.map((event) => <article className="timeline-event" key={event.event_id}><div className={`timeline-dot verdict-dot-${event.verdict?.toLowerCase() ?? "neutral"}`} /><div><div className="event-meta"><span>{formatDate(event.timestamp)}</span><b>{event.type.replace(/_/g, " ")}</b>{event.verdict && <i className={`verdict-tag verdict-${event.verdict.toLowerCase()}`}>{event.verdict}</i>}</div><p>{event.summary}</p></div></article>)}</div> : <p className="empty-copy">Aún no hay actividad — corre a Saturday para empezar.</p>}
+          {loading ? <p className="empty-copy">Cargando tu actividad…</p> : events.length ? <div className="timeline">{events.map((event) => <article className="timeline-event" key={event.event_id}><div className={`timeline-dot verdict-dot-${event.verdict?.toLowerCase() ?? "neutral"}`} /><div><div className="event-meta"><span>{formatDate(event.timestamp)}</span><b>{auditTypeLabel(event.type)}</b>{event.verdict && <i className={`verdict-tag verdict-${event.verdict.toLowerCase()}`}>{verdictLabel(event.verdict)}</i>}</div><p>{localizedText(event.summary)}</p></div></article>)}</div> : <p className="empty-copy">Aún no hay actividad — corre a Saturday para empezar.</p>}
         </section>
       </section>
     </main>

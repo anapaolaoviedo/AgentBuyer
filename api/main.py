@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from audit.log import append_entry
-from core.mandate_store import create_mandate, get_mandate, revoke_mandate
+from core.mandate_store import create_mandate, get_mandate, reset_mandate, revoke_mandate
 from core.seed_loader import load_seed_mandates
 
 
@@ -78,6 +78,15 @@ def revoke_mandate_endpoint(mandate_id: str):
                 "summary": "Mandato revocado por la persona autorizante.",
             }
         )
+    return record
+
+
+@app.post("/mandates/{mandate_id}/reset")
+def reset_mandate_endpoint(mandate_id: str):
+    """Restaura el mandato a un estado vivo fresco para reiniciar la demo."""
+    record = reset_mandate(mandate_id)
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mandato no encontrado.")
     return record
 
 
