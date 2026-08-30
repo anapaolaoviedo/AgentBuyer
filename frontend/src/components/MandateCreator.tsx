@@ -46,12 +46,12 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
   // Modal y Hooks Biométicos
   const [showBioModal, setShowBioModal] = useState(false);
   const [bioMode, setBioMode] = useState<"camera" | "fingerprint">("camera");
-  const [passkeyVerified, setPasskeyVerified] = useState(true);
-  const [smsVerified, setSmsVerified] = useState(true);
-  const [tokenVerified, setTokenVerified] = useState(true);
+  const [passkeyVerified, setPasskeyVerified] = useState(false);
+  const [smsVerified, setSmsVerified] = useState(false);
+  const [tokenVerified, setTokenVerified] = useState(false);
 
-  const { videoRef, livenessState, startCamera, stopCamera, verifyFacePresence, verifySmsCode } = useLivenessVerification();
-  const { handlePasskeyChallenge } = useZeroTrustSecurity();
+  const { videoRef, livenessState, startCamera, stopCamera, verifyFacePresence, sendSmsCode, verifySmsCode } = useLivenessVerification();
+  const { handlePasskeyChallenge, handleTokenizeCard, sendOtp, verifyOtp, isSubmitEnabled, isStripeTokenized, isPossessionVerified, errorMessage: securityError, isLoading: securityLoading } = useZeroTrustSecurity();
 
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -134,6 +134,15 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
       signature: "ed25519_passkey_signed_jwt_token",
     };
 
+    if (!tokenVerified) {
+      try {
+        const token = await handleTokenizeCard();
+        if (token) setTokenVerified(true);
+      } catch (e) {
+        setError("No se pudo tokenizar el método de pago.");
+        return;
+      }
+    }
     setCreating(true);
     try {
       const response = await fetch(`${API_BASE}/mandates`, {
@@ -224,8 +233,8 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
                 Código SMS (OTP):
                 <div style={{ display: "flex", gap: "6px" }}>
                   <input value={smsOtp} onChange={(e) => setSmsOtp(e.target.value)} placeholder="849201" maxLength={6} style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
-                  <button type="button" onClick={async () => { await sendSmsCode(userPhone); setSmsOtp("849201"); setSmsVerified(true); }} style={{ background: "rgba(59, 130, 246, 0.2)", border: "1px solid #3b82f6", color: "#93c5fd", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: "0 8px", white-space: "nowrap" }}>📲 Enviar</button>
-                  <button type="button" onClick={async () => { await verifySmsCode(userPhone, smsOtp); setSmsVerified(true); }} style={{ background: "rgba(16, 185, 129, 0.25)", border: "1px solid #10b981", color: "#6ee7b7", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: "0 10px" }}>OK</button>
+                  <button type="button" onClick={async () => { try { await sendOtp(userPhone, "sms"); } catch(e) { console.warn(e); } }} style={{ background: "rgba(59, 130, 246, 0.2)", border: "1px solid #3b82f6", color: "#93c5fd", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: "0 8px", whiteSpace: "nowrap" }}>📲 Enviar</button>
+                  <button type="button" onClick={async () => { try { const res = await verifyOtp(userPhone, smsOtp, "sms"); if (res) setSmsVerified(true); } catch(e) { console.warn(e); } }} style={{ background: smsVerified ? "rgba(16, 185, 129, 0.45)" : "rgba(16, 185, 129, 0.25)", border: "1px solid #10b981", color: "#6ee7b7", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: "0 10px" }}>{smsVerified ? "✓" : "OK"}</button>
                 </div>
               </label>
             </div>
@@ -260,8 +269,8 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
           </div>
 
           <div className="permission-summary"><span>ASÍ SE VERÁ TU PERMISO</span><p>{summary}</p></div>
-          {error && <div className="form-error" role="alert">{error}</div>}
-          <button className="authorize-button" disabled={creating} type="submit">{creating ? "CREANDO TU PERMISO…" : "AUTORIZAR A SATURDAY"}</button>
+          {(error || securityError) && <div className="form-error" role="alert">{error || securityError}</div>}
+          <button className="authorize-button" disabled={creating || !(passkeyVerified && smsVerified && tokenVerified)} type="submit">{creating ? "CREANDO TU PERMISO…" : !passkeyVerified ? "⚠ FALTA BIOMETRÍA" : !smsVerified ? "⚠ FALTA SMS OTP" : !tokenVerified ? "⚠ FALTA TOKEN BANCARIO" : "AUTORIZAR A SATURDAY"}</button>
         </form>
       </section>
     </main>

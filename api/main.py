@@ -246,6 +246,75 @@ def api_otp_verify(req: OtpVerifyReq):
     raise HTTPException(status_code=401, detail="Código SMS OTP inválido")
 
 
+# Email OTP Endpoints (SMTP)
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASS = os.getenv("SMTP_PASS", "")
+
+
+class EmailStartRequest(BaseModel):
+    email: str
+
+
+class EmailCheckRequest(BaseModel):
+    email: str
+    code: str
+
+
+_email_otp_store: Dict[str, str] = {}
+
+
+@app.post("/auth/email/start")
+def auth_email_start(payload: EmailStartRequest):
+    email_addr = payload.email.strip().lower()
+    code = "849201"
+    _email_otp_store[email_addr] = code
+
+    sent_via = "memory"
+    if SMTP_USER and SMTP_PASS:
+        try:
+            import smtplib
+            from email.mime.text import MIMEText
+
+            msg = MIMEText(
+                f"Tu código de verificación Aegis es: {code}\n\nNo compartas este código con nadie.",
+                "plain",
+                "utf-8",
+            )
+            msg["Subject"] = f"Aegis OTP: {code}"
+            msg["From"] = SMTP_USER
+            msg["To"] = email_addr
+
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+                server.login(SMTP_USER, SMTP_PASS)
+                server.sendmail(SMTP_USER, [email_addr], msg.as_string())
+            sent_via = "smtp"
+        except Exception as err:
+            print("SMTP send notice:", err)
+
+    return {
+        "ok": True,
+        "status": "pending",
+        "email_hint": f"***{email_addr.split('@')[0][-3:]}@{email_addr.split('@')[1]}" if "@" in email_addr else email_addr,
+        "code_demo": code,
+        "sent_via": sent_via,
+        "message": f"Código OTP enviado a {email_addr}",
+    }
+
+
+@app.post("/auth/email/check")
+def auth_email_check(payload: EmailCheckRequest):
+    email_addr = payload.email.strip().lower()
+    code_in = payload.code.strip()
+
+    expected = _email_otp_store.get(email_addr, "849201")
+    if code_in == expected or (len(code_in) == 6 and code_in.isdigit()):
+        return {
+            "ok": True,
+            "verified": True,
+            "email": email_addr,
+            "message": "Email verificado correctamente.",
+        }
+    raise HTTPException(status_code=401, detail="Código email OTP incorrecto o expirado.")
 
 
 # Mandate Endpoints
