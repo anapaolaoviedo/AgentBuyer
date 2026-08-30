@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState, useEffect } from "react";
 import Saturday from "./Saturday";
 import { useLivenessVerification } from "../hooks/useLivenessVerification";
 import { useZeroTrustSecurity } from "../hooks/useZeroTrustSecurity";
@@ -51,7 +51,16 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
   const [tokenVerified, setTokenVerified] = useState(false);
 
   const { videoRef, livenessState, startCamera, stopCamera, verifyFacePresence, sendSmsCode, verifySmsCode } = useLivenessVerification();
-  const { handlePasskeyChallenge, handleTokenizeCard, sendOtp, verifyOtp, isSubmitEnabled, isStripeTokenized, isPossessionVerified, errorMessage: securityError, isLoading: securityLoading } = useZeroTrustSecurity();
+  const { handlePasskeyChallenge, handleTokenizeCard, sendOtp, verifyOtp, isSubmitEnabled, isStripeTokenized, isPossessionVerified, paymentMethodId, errorMessage: securityError, isLoading: securityLoading } = useZeroTrustSecurity();
+
+  // Auto-tokenización reactiva de tarjeta
+  useEffect(() => {
+    if (cardNumber && cardNumber.trim().length >= 4) {
+      handleTokenizeCard(cardNumber).then((tok) => {
+        if (tok) setTokenVerified(true);
+      }).catch(() => {});
+    }
+  }, [cardNumber, handleTokenizeCard]);
 
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -125,18 +134,18 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
         sms_code: smsOtp,
       },
       payment_token: {
-        token_id: `vtok_${Math.random().toString(36).slice(2, 10)}`,
+        token_id: paymentMethodId || `vtok_${Math.random().toString(36).slice(2, 10)}`,
         token_type: "SCOPED_VIRTUAL_TOKEN",
-        masked_card: cardNumber || "•••• 4242",
+        masked_card: cardNumber ? (cardNumber.startsWith("••••") ? cardNumber : `•••• ${cardNumber.replace(/\D/g, "").slice(-4) || "4242"}`) : "•••• 4242",
         bank_issuer: "Stripe Elements / Galicia AI Payments",
       },
       ...(validUntil ? { valid_until: validUntil } : {}),
       signature: "ed25519_passkey_signed_jwt_token",
     };
 
-    if (!tokenVerified) {
+    if (!tokenVerified && !isStripeTokenized) {
       try {
-        const token = await handleTokenizeCard();
+        const token = await handleTokenizeCard(cardNumber);
         if (token) setTokenVerified(true);
       } catch (e) {
         setError("No se pudo tokenizar el método de pago.");
@@ -227,7 +236,22 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
             <div className="form-pair" style={{ marginTop: "8px" }}>
               <label style={{ fontSize: "0.72rem" }}>
                 💳 Método de Pago (Stripe Elements / Scoped Token):
-                <input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="•••• •••• •••• 4242" style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
+                <input
+                  value={cardNumber}
+                  onChange={(e) => {
+                    setCardNumber(e.target.value);
+                  }}
+                  onBlur={async () => {
+                    try {
+                      const tok = await handleTokenizeCard(cardNumber);
+                      if (tok) setTokenVerified(true);
+                    } catch (e) {
+                      console.warn(e);
+                    }
+                  }}
+                  placeholder="•••• •••• •••• 4242"
+                  style={{ minHeight: "2.3rem", fontSize: "0.82rem" }}
+                />
               </label>
               <label style={{ fontSize: "0.72rem" }}>
                 Código SMS (OTP):
@@ -258,19 +282,38 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
                 {passkeyVerified ? "✓ Face ID / Huella Verificada" : "📷 Abrir Face ID / Huella"}
               </button>
 
-              <span style={{ fontSize: "0.72rem", color: "#6ee7b7", background: "rgba(16, 185, 129, 0.15)", padding: "4px 8px", borderRadius: "6px", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
-                ✓ SMS Verificado
+              <span style={{ fontSize: "0.72rem", color: smsVerified ? "#6ee7b7" : "#8A94AD", background: smsVerified ? "rgba(16, 185, 129, 0.15)" : "rgba(138, 148, 173, 0.1)", padding: "4px 8px", borderRadius: "6px", border: smsVerified ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(138, 148, 173, 0.2)" }}>
+                {smsVerified ? "✓ SMS Verificado" : "⏳ SMS Pendiente"}
               </span>
 
-              <span style={{ fontSize: "0.72rem", color: "#93c5fd", background: "rgba(59, 130, 246, 0.15)", padding: "4px 8px", borderRadius: "6px", border: "1px solid rgba(59, 130, 246, 0.3)" }}>
-                🛡️ Token DLP: <code>vtok_...</code>
-              </span>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const tok = await handleTokenizeCard(cardNumber);
+                    if (tok) setTokenVerified(true);
+                  } catch (e) {
+                    console.warn(e);
+                  }
+                }}
+                style={{
+                  fontSize: "0.72rem",
+                  color: tokenVerified || isStripeTokenized ? "#6ee7b7" : "#93c5fd",
+                  background: tokenVerified || isStripeTokenized ? "rgba(16, 185, 129, 0.15)" : "rgba(59, 130, 246, 0.15)",
+                  padding: "4px 8px",
+                  borderRadius: "6px",
+                  border: tokenVerified || isStripeTokenized ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(59, 130, 246, 0.3)",
+                  cursor: "pointer",
+                }}
+              >
+                {tokenVerified || isStripeTokenized ? `🛡️ Token DLP: ${paymentMethodId || "vtok_scoped"} ✓` : "🛡️ Tokenizar Tarjeta DLP"}
+              </button>
             </div>
           </div>
 
           <div className="permission-summary"><span>ASÍ SE VERÁ TU PERMISO</span><p>{summary}</p></div>
           {(error || securityError) && <div className="form-error" role="alert">{error || securityError}</div>}
-          <button className="authorize-button" disabled={creating || !(passkeyVerified && smsVerified && tokenVerified)} type="submit">{creating ? "CREANDO TU PERMISO…" : !passkeyVerified ? "⚠ FALTA BIOMETRÍA" : !smsVerified ? "⚠ FALTA SMS OTP" : !tokenVerified ? "⚠ FALTA TOKEN BANCARIO" : "AUTORIZAR A SATURDAY"}</button>
+          <button className="authorize-button" disabled={creating || !(passkeyVerified && smsVerified && (tokenVerified || isStripeTokenized))} type="submit">{creating ? "CREANDO TU PERMISO…" : !passkeyVerified ? "⚠ FALTA BIOMETRÍA" : !smsVerified ? "⚠ FALTA SMS OTP" : !(tokenVerified || isStripeTokenized) ? "⚠ FALTA TOKEN BANCARIO" : "AUTORIZAR A SATURDAY"}</button>
         </form>
       </section>
     </main>
