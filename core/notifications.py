@@ -1,6 +1,7 @@
 ﻿import os
 import smtplib
-from datetime import datetime, timezone
+import urllib.parse
+from datetime import datetime, timezone, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -11,6 +12,7 @@ def enviar_ticket_confirmacion(correo_destino: str, detalles_reserva: dict) -> d
     """
     Envía el recibo oficial / confirmación de compra de logística comercial
     al usuario una vez que el agente completa la compra autónoma con veredicto APPROVE.
+    Incluye botón 1-click para Google Calendar y archivo adjunto .ics interactivo.
     """
     dest = (correo_destino or "").strip()
     if not dest or "@" not in dest:
@@ -25,10 +27,40 @@ def enviar_ticket_confirmacion(correo_destino: str, detalles_reserva: dict) -> d
     pasajero = detalles_reserva.get('pasajero') or 'Marta (Titular Autorizante)'
     id_cliente = detalles_reserva.get('candidate_id') or 'mnd_live_8492'
     token_id = detalles_reserva.get('token_id', 'vtok_849201_4242')
-    fecha_actual = datetime.now(timezone.utc).strftime("%A, %B %d, %Y")
-    hora_actual = datetime.now(timezone.utc).strftime("%I:%M %p UTC")
+    
+    now_utc = datetime.now(timezone.utc)
+    fecha_actual = now_utc.strftime("%A, %B %d, %Y")
+    hora_actual = now_utc.strftime("%I:%M %p UTC")
 
-    msg = MIMEMultipart()
+    # Programación del evento en calendario (3 días adelante a las 14:00 UTC)
+    event_start = now_utc + timedelta(days=3)
+    event_start = event_start.replace(hour=14, minute=0, second=0, microsecond=0)
+    event_end = event_start + timedelta(hours=2)
+    start_str = event_start.strftime("%Y%m%dT%H%M%SZ")
+    end_str = event_end.strftime("%Y%m%dT%H%M%SZ")
+
+    cal_title = f"✈️ Vuelo: {destino} [{pnr}]"
+    cal_details = (
+        f"Reserva confirmada de forma autónoma por Saturday Agent (Aegis Zero-Trust).\n"
+        f"Código de Reserva (PNR): {pnr}\n"
+        f"Proveedor: {proveedor}\n"
+        f"Titular: {pasajero}\n"
+        f"Total Cobrado: ${precio:.2f} {moneda}\n"
+        f"Método de Pago: Scoped Virtual Token ({token_id})\n"
+        f"Sello de Seguridad: Ed25519 & Semantic Firewall Validated.\n\n"
+        f"Check-in online disponible 24h antes del vuelo."
+    )
+    cal_location = f"{destino}"
+
+    gcal_url = (
+        f"https://calendar.google.com/calendar/render?action=TEMPLATE"
+        f"&text={urllib.parse.quote(cal_title)}"
+        f"&dates={start_str}/{end_str}"
+        f"&details={urllib.parse.quote(cal_details)}"
+        f"&location={urllib.parse.quote(cal_location)}"
+    )
+
+    msg = MIMEMultipart("mixed")
     msg['Subject'] = f"Reservation Confirmation & Receipt - {pnr} - Aegis Saturday Agent"
     msg['From'] = f"Saturday Agent <{SMTP_USER}>" if SMTP_USER else "Saturday Agent <aegis@zero-trust.protocol>"
     msg['To'] = dest
@@ -151,6 +183,19 @@ def enviar_ticket_confirmacion(correo_destino: str, detalles_reserva: dict) -> d
           font-family: monospace;
           font-weight: bold;
         }}
+        .calendar-btn {{
+          display: inline-block;
+          background-color: #2563eb;
+          color: #ffffff !important;
+          text-decoration: none;
+          padding: 10px 18px;
+          border-radius: 6px;
+          font-size: 0.85rem;
+          font-weight: 700;
+          border: 1px solid #3b82f6;
+          box-shadow: 0 4px 12px rgba(37,99,235,0.3);
+          transition: background-color 0.2s;
+        }}
       </style>
     </head>
     <body>
@@ -186,6 +231,16 @@ def enviar_ticket_confirmacion(correo_destino: str, detalles_reserva: dict) -> d
             <td class="details-value">{proveedor} (Direct Check-in Enabled)</td>
           </tr>
         </table>
+
+        <!-- BOTÓN GOOGLE CALENDAR -->
+        <div style="text-align: center; margin: 18px 0 22px; padding: 14px; background-color: #1e2638; border-radius: 6px; border: 1px solid #2d3b55;">
+          <div style="font-size: 0.82rem; color: #cbd5e1; margin-bottom: 10px;">
+            🗓️ Sincroniza este itinerario directamente con tu agenda:
+          </div>
+          <a href="{gcal_url}" target="_blank" class="calendar-btn">
+            📅 Agregar a Google Calendar
+          </a>
+        </div>
 
         <hr class="divider">
 
@@ -285,7 +340,32 @@ def enviar_ticket_confirmacion(correo_destino: str, detalles_reserva: dict) -> d
     </html>
     """
 
+    # 1. Adjuntar HTML
     msg.attach(MIMEText(html, 'html', 'utf-8'))
+
+    # 2. Adjuntar invitación interactiva iCalendar (.ics) para detección nativa en Gmail
+    ics_content = f"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Aegis Protocol//Saturday Agent//ES
+CALSCALE:GREGORIAN
+METHOD:REQUEST
+BEGIN:VEVENT
+UID:aegis-{pnr}-{int(now_utc.timestamp())}@zero-trust.protocol
+DTSTAMP:{now_utc.strftime('%Y%m%dT%H%M%SZ')}
+DTSTART:{start_str}
+DTEND:{end_str}
+SUMMARY:✈️ Vuelo: {destino} [{pnr}]
+DESCRIPTION:Reserva confirmada de forma autónoma por Saturday Agent.\\nPNR: {pnr}\\nTotal: ${precio:.2f} {moneda}\\nSello Zero-Trust Ed25519.
+LOCATION:{destino}
+STATUS:CONFIRMED
+ORGANIZER;CN=Saturday Agent:mailto:{SMTP_USER or 'saturday.agentbuyer@gmail.com'}
+ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;CN={pasajero}:mailto:{dest}
+END:VEVENT
+END:VCALENDAR"""
+
+    part_ics = MIMEText(ics_content, 'calendar; method=REQUEST; charset="utf-8"', 'utf-8')
+    part_ics.add_header('Content-Disposition', 'attachment; filename="itinerario-saturday.ics"')
+    msg.attach(part_ics)
 
     current_smtp_user = os.environ.get("SMTP_USER", "")
     current_smtp_pass = os.environ.get("SMTP_PASS", "")
@@ -295,7 +375,7 @@ def enviar_ticket_confirmacion(correo_destino: str, detalles_reserva: dict) -> d
             with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
                 server.login(current_smtp_user, current_smtp_pass)
                 server.send_message(msg)
-            print(f"[Gmail SMTP] Recibo oficial enviado exitosamente a {dest}")
+            print(f"[Gmail SMTP] Recibo oficial con Google Calendar enviado exitosamente a {dest}")
             return {"status": 200, "mensaje": "Recibo oficial enviado con éxito.", "enviado_a": dest}
         except Exception as e:
             print(f"Aviso SMTP al enviar recibo a {dest}: {e}")
