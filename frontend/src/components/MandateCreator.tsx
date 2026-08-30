@@ -38,9 +38,10 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
   
   // 🛡️ Identidad y Datos Bancarios DLP
   const [userIdDoc, setUserIdDoc] = useState("PASSPORT-AR-948291");
-  const [userPhone, setUserPhone] = useState("+54 9 11 5829-1039");
+  const [userPhone, setUserPhone] = useState("5614473083");
   const [smsOtp, setSmsOtp] = useState("849201");
   const [cardNumber, setCardNumber] = useState("•••• •••• •••• 4242");
+
 
   // Modal y Hooks Biométicos
   const [showBioModal, setShowBioModal] = useState(false);
