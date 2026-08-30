@@ -546,12 +546,29 @@ def api_webhook_travel_provider(payload: dict):
     pnr = payload.get("pnr", "PNR-VYA-849201")
     flight_id = payload.get("flight_id", "FLIGHT_COR_130")
     status_str = payload.get("status", "TICKET_ISSUED")
+    user_email = payload.get("email") or os.getenv("SMTP_USER", "")
 
     append_entry({
         "type": "settlement_completed",
         "mandate_id": payload.get("mandate_id", "mnd_live"),
         "summary": f"Emisión de boleto confirmada por aerolínea: PNR {pnr} ({status_str}).",
     })
+
+    try:
+        from core.notifications import enviar_ticket_confirmacion
+        enviar_ticket_confirmacion(
+            correo_destino=user_email,
+            detalles_reserva={
+                "destino": payload.get("destination", "Córdoba (COR)"),
+                "proveedor": payload.get("merchant", "VuelaYa Travel"),
+                "pnr": pnr,
+                "precio_total": payload.get("amount", 130),
+                "moneda": "USD",
+            }
+        )
+    except Exception as notify_err:
+        print("Aviso al enviar ticket desde webhook:", notify_err)
+
     return {"received": True, "pnr": pnr, "status": status_str}
 
 

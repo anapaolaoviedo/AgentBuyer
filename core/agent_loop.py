@@ -1,3 +1,4 @@
+import os
 import uuid
 import secrets
 from datetime import datetime, timezone
@@ -245,6 +246,21 @@ def run_agent(mandate_id: str, search_fields: dict | None = None) -> dict:
                 "summary": f"Compra completada por Saturday: {selected_flight['route']} por {selected_flight['price']} USD.",
             }
         )
+        try:
+            from core.notifications import enviar_ticket_confirmacion
+            user_email = mandate.get("human", {}).get("email") or os.environ.get("SMTP_USER", "")
+            enviar_ticket_confirmacion(
+                correo_destino=user_email,
+                detalles_reserva={
+                    "destino": selected_flight.get("route", "Buenos Aires ➔ Córdoba"),
+                    "proveedor": selected_flight.get("merchant", "VuelaYa Travel"),
+                    "pnr": f"PNR-VYA-{attempt_id[-6:].upper()}",
+                    "precio_total": selected_flight.get("price", 130),
+                    "moneda": "USD",
+                }
+            )
+        except Exception as notify_err:
+            print("Aviso al enviar ticket de confirmación:", notify_err)
     return {
         "mandate_id": mandate_id,
         "attempt_id": attempt_id,
