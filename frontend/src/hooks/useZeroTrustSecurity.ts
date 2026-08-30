@@ -297,7 +297,7 @@ export function useZeroTrustSecurity() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Error al solicitar OTP: HTTP ${response.status}`);
+        throw new Error(errorData.detail || `Error requesting OTP: HTTP ${response.status}`);
       }
 
       const result = await response.json();

@@ -159,7 +159,9 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
   const [userEmail, setUserEmail] = useState("marta@example.com");
   // Canal del código de verificación: SMS al teléfono o correo electrónico.
   const [otpChannel, setOtpChannel] = useState<"sms" | "email">("sms");
-  const [smsOtp, setSmsOtp] = useState("849201");
+  // El backend ahora genera códigos aleatorios; en modo demo (sin Twilio/SMTP)
+  // devuelve code_demo en la respuesta y el campo se autollena al enviar.
+  const [smsOtp, setSmsOtp] = useState("");
   const [cardNumber, setCardNumber] = useState("4242 4242 4242 4242");
 
   // Modal y Hooks Biométicos
@@ -464,7 +466,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
                     {userEmail.trim() !== "" && !emailComplete && <p className="verify-hint verify-hint-warn">Enter a valid email (name@domain.com).</p>}
                   </>}
                   <div className="sms-code-controls">
-                    <button className="verify-action" type="button" disabled={securityLoading || !otpContactReady} onClick={async () => { try { await sendOtp(otpChannel === "email" ? userEmail : userPhone, otpChannel); setSmsCodeSent(true); } catch (e) { console.warn(e); } }}>
+                    <button className="verify-action" type="button" disabled={securityLoading || !otpContactReady} onClick={async () => { try { const res = await sendOtp(otpChannel === "email" ? userEmail : userPhone, otpChannel); setSmsCodeSent(true); const demoCode = typeof res?.code_demo === "string" && /^\d{6}$/.test(res.code_demo) ? res.code_demo : ""; if (demoCode) setSmsOtp(demoCode); } catch (e) { console.warn(e); } }}>
                       {smsCodeSent ? "Resend code" : otpChannel === "email" ? "Send code by email" : "Send SMS code"}
                     </button>
                     <input value={smsOtp} onChange={(e) => { setSmsOtp(e.target.value); setSmsVerified(false); }} onFocus={() => setSensitiveFieldFocused(true)} onBlur={() => setSensitiveFieldFocused(false)} placeholder="6-digit code" maxLength={6} inputMode="numeric" aria-label="6-digit code received" />
