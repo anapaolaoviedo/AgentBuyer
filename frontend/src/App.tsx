@@ -4,7 +4,7 @@ import Saturday, { type SaturdayState } from "./components/Saturday";
 import MandateCreator from "./components/MandateCreator";
 import AccountView from "./components/AccountView";
 import AuditView from "./components/AuditView";
-import { checkDetailLabel, checkRuleLabel, displayName, localizedText, saturdayStateLabel, verdictLabel } from "./lib/presentation";
+import { checkDetailLabel, checkRuleLabel, displayName, localizedText, saturdayStateLabel, translateBackendText, verdictLabel } from "./lib/presentation";
 
 const API_BASE = "http://127.0.0.1:8000";
 
@@ -36,18 +36,20 @@ type MandateRecord = {
   live_state: LiveState;
 };
 
-type Flight = { id: string; route: string; price: number; category: string; merchant_id: string; source?: "web" | "mock" };
+type Flight = { id: string; route: string; price: number; category: string; merchant_id: string; merchant?: string; details?: string; url?: string; source?: "web" };
 type Check = { rule: string; pass: boolean; detail: string };
 type Verification = { verdict: "APPROVE" | "ESCALATE" | "REJECT"; checks: Check[]; human_readable?: string };
 type AgentRun = {
-  attempt_id?: string;
-  discovery_source?: "web" | "mock";
+  attempt_id?: string | null;
+  discovery_source?: string;
   verification?: Verification;
   verdict?: Verification["verdict"];
   checks?: Check[];
   human_readable?: string;
-  selected_flight?: Flight;
+  selected_flight?: Flight | null;
   flights_seen?: Flight[];
+  selection_reason?: string;
+  no_offers?: boolean;
   purchase_completed?: boolean;
 };
 
@@ -62,12 +64,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...options?.headers },
   });
   if (!response.ok) {
-    // El backend explica sus 404/409/422 en `detail`; se muestra tal cual
-    // (clave para los errores de la revisión humana: mandato revocado, etc.).
-    let message = `El sistema respondió ${response.status}.`;
+    // El backend explica sus 404/409/422 en `detail`; se traduce en la capa
+    // de presentación (clave para los errores de la revisión humana).
+    let message = `The system responded ${response.status}.`;
     try {
       const body = (await response.json()) as { detail?: string };
-      if (typeof body.detail === "string" && body.detail) message = body.detail;
+      if (typeof body.detail === "string" && body.detail) message = translateBackendText(body.detail);
     } catch { /* cuerpo no-JSON: se conserva el mensaje genérico */ }
     throw new Error(message);
   }
@@ -79,23 +81,28 @@ function verdictState(verdict: Verification["verdict"]): SaturdayState {
 }
 
 function amount(value?: number, currency = "USD") {
-  return new Intl.NumberFormat("es-MX", { style: "currency", currency, maximumFractionDigits: 0 }).format(value ?? 0);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 0 }).format(value ?? 0);
 }
 
 function wait(milliseconds: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
+function merchantName(flight?: Flight | null) {
+  if (!flight) return "el comercio";
+  return flight.merchant ?? (flight.merchant_id ? displayName(flight.merchant_id) : "el comercio");
+}
+
 function toastFor(run: AgentRun, result: Verification): Omit<Toast, "id"> {
   const flight = run.selected_flight;
   const purchaseAmount = flight?.price;
-  const merchant = flight?.merchant_id ? displayName(flight.merchant_id) : "el comercio";
-  if (result.verdict === "APPROVE") return { tone: "approve", message: `💳 Pago aprobado — ${amount(purchaseAmount)} en ${merchant}` };
-  if (result.verdict === "ESCALATE") return { tone: "escalate", message: `⏸ Requiere tu aprobación — ${amount(purchaseAmount)} en ${merchant}` };
+  const merchant = merchantName(flight);
+  if (result.verdict === "APPROVE") return { tone: "approve", message: `💳 Payment approved — ${amount(purchaseAmount)} at ${merchant}` };
+  if (result.verdict === "ESCALATE") return { tone: "escalate", message: `⏸ Needs your approval — ${amount(purchaseAmount)} at ${merchant}` };
   const revoked = result.checks.some((check) => check.rule === "status" && !check.pass && check.detail.toLowerCase().includes("revocado"));
   return revoked
-    ? { tone: "reject", message: "🔒 Pago bloqueado — mandato revocado" }
-    : { tone: "reject", message: "⚠ Intento bloqueado — verificación fallida" };
+    ? { tone: "reject", message: "🔒 Payment blocked — mandate revoked" }
+    : { tone: "reject", message: "⚠ Attempt blocked — verification failed" };
 }
 
 type MissionControlProps = {
@@ -115,13 +122,11 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   const [phase, setPhase] = useState<DecisionPhase>("idle");
-  const [scannedFlight, setScannedFlight] = useState<number | null>(null);
-  const [chosenFlightId, setChosenFlightId] = useState<string | null>(null);
   const [revealedChecks, setRevealedChecks] = useState(0);
   // Intento escalado pendiente de la decisión humana (approve/decline).
   const [escalatedAttemptId, setEscalatedAttemptId] = useState<string | null>(null);
-  // Ruta pedida cuando la búsqueda web no devolvió nada y se usó el catálogo demo.
-  const [searchFellBack, setSearchFellBack] = useState<string | null>(null);
+  // La búsqueda web real no devolvió vuelos (ya no existe catálogo demo de respaldo).
+  const [noOffers, setNoOffers] = useState(false);
 
   const constraints = mandate?.mandate.constraints ?? {};
   const priceLimit = useMemo(
@@ -134,25 +139,22 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
   );
   const phaseCopy: Record<DecisionPhase, string> = {
     idle: "",
-    discovering: "Descubriendo vuelos…",
-    evaluating: "Evaluando límites…",
-    choosing: "Eligiendo la mejor opción…",
-    verifying: "Verificando con el guardián…",
+    discovering: "Searching for real flights on the web…",
+    evaluating: "Checking your limits…",
+    choosing: "Picking the best option…",
+    verifying: "Verifying with the gatekeeper…",
   };
 
   const loadMission = useCallback(async (preserveSaturday = false) => {
     setBusy("loading");
     setError(null);
     try {
-      const [mandateData, flightData] = await Promise.all([
-        request<MandateRecord>(`/mandates/${mandateId}`),
-        request<Flight[]>("/merchant/flights"),
-      ]);
+      // Solo el mandato: los vuelos llegan de la búsqueda web real al correr el agente.
+      const mandateData = await request<MandateRecord>(`/mandates/${mandateId}`);
       setMandate(mandateData);
-      setFlights(flightData);
       if (!preserveSaturday) setSaturdayState(mandateData.live_state.status === "revoked" ? "reject" : "idle");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "No hay conexión con el sistema.");
+      setError(caught instanceof Error ? caught.message : "No connection to the system.");
     } finally {
       setBusy(null);
     }
@@ -172,50 +174,41 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
     setVerification(null);
     setPendingVerification(null);
     setActivity(null);
-    setChosenFlightId(null);
+    setFlights([]);
     setRevealedChecks(0);
     setEscalatedAttemptId(null);
-    setSearchFellBack(null);
+    setNoOffers(false);
     setSaturdayState("thinking");
 
     try {
-      // Se inicia la operación real al comienzo; la UI solo demora su presentación.
-      const agentRequest = request<AgentRun>("/agent/run", {
+      // La búsqueda web real puede tardar hasta un minuto; la fase "discovering"
+      // dura lo que dure la petición, sin animaciones inventadas.
+      setPhase("discovering");
+      const run = await request<AgentRun>("/agent/run", {
         method: "POST",
         body: JSON.stringify({
           mandate_id: mandateId,
           ...(mandate?.mandate.search_fields ? { search_fields: mandate.mandate.search_fields } : {}),
         }),
       });
-      setPhase("discovering");
-      for (let index = 0; index < flights.length; index += 1) {
-        setScannedFlight(index);
-        await wait(150);
-      }
-      setScannedFlight(null);
-      await wait(250);
-      setPhase("evaluating");
-      await wait(850);
 
-      // La elección nunca se inventa: esperamos el vuelo devuelto por /agent/run.
-      const run = await agentRequest;
+      // Sin catálogo demo: si la web no devolvió vuelos, se dice tal cual.
+      if (run.no_offers || !run.selected_flight) {
+        setNoOffers(true);
+        setActivity(run);
+        setSaturdayState(mandate?.live_state.status === "revoked" ? "reject" : "idle");
+        return;
+      }
+
       const result: Verification = run.verification ?? {
         verdict: run.verdict ?? "REJECT",
         checks: run.checks ?? [],
         human_readable: run.human_readable,
       };
-      // La respuesta normalizada del backend reemplaza el catálogo inicial.
-      if (run.flights_seen?.length) setFlights(run.flights_seen);
-      // Si el mandato pedía una ruta real pero la búsqueda web no devolvió ofertas,
-      // el backend cae al catálogo demo (BUE→COR). NUNCA silencioso: se avisa.
-      const wantedRoute = mandate?.mandate.search_fields;
-      if (wantedRoute?.origin && wantedRoute?.destination && run.discovery_source === "mock") {
-        setSearchFellBack(`${wantedRoute.origin} → ${wantedRoute.destination}`);
-      } else {
-        setSearchFellBack(null);
-      }
+      setFlights(run.flights_seen ?? []);
+      setPhase("evaluating");
+      await wait(850);
       setPhase("choosing");
-      setChosenFlightId(run.selected_flight?.id ?? null);
       await wait(700);
 
       setPhase("verifying");
@@ -234,11 +227,10 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
       const mandateData = await request<MandateRecord>(`/mandates/${mandateId}`);
       setMandate(mandateData);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "No hay conexión con el sistema.");
+      setError(caught instanceof Error ? caught.message : "No connection to the system.");
       setSaturdayState(mandate?.live_state.status === "revoked" ? "reject" : "idle");
     } finally {
       setPhase("idle");
-      setScannedFlight(null);
       setBusy(null);
     }
   }
@@ -254,14 +246,15 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
       setVerification(null);
       setPendingVerification(null);
       setActivity(null);
-      setChosenFlightId(null);
+      setFlights([]);
+      setNoOffers(false);
       setRevealedChecks(0);
       setEscalatedAttemptId(null);
       setPhase("idle");
       setSaturdayState("reject");
       setToast({ id: Date.now(), tone: "reject", message: "🔒 Mandato revocado — Saturday ya no puede comprar" });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "No hay conexión con el sistema.");
+      setError(caught instanceof Error ? caught.message : "No connection to the system.");
     } finally {
       setBusy(null);
     }
@@ -289,7 +282,7 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
       setMandate(mandateData);
     } catch (caught) {
       // El mandato pudo revocarse entre la escalación y la decisión: el backend lo explica.
-      setError(caught instanceof Error ? caught.message : "No hay conexión con el sistema.");
+      setError(caught instanceof Error ? caught.message : "No connection to the system.");
     } finally {
       setBusy(null);
     }
@@ -304,21 +297,22 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
       setVerification(null);
       setPendingVerification(null);
       setActivity(null);
-      setChosenFlightId(null);
+      setFlights([]);
+      setNoOffers(false);
       setRevealedChecks(0);
       setEscalatedAttemptId(null);
       setPhase("idle");
       setSaturdayState("idle");
       setToast(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "No hay conexión con el sistema.");
+      setError(caught instanceof Error ? caught.message : "No connection to the system.");
     } finally {
       setBusy(null);
     }
   }
 
   const status = mandate?.live_state.status ?? "loading";
-  const statusLabel = status === "active" ? "ACTIVO" : status === "revoked" ? "REVOCADO" : status === "expired" ? "EXPIRADO" : "CARGANDO";
+  const statusLabel = status === "active" ? "ACTIVE" : status === "revoked" ? "REVOKED" : status === "expired" ? "EXPIRED" : "LOADING";
   const displayedVerification = verification ?? pendingVerification;
   const displayedChecks = verification
     ? verification.checks
@@ -334,14 +328,14 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
             <h1>Centro de confianza para agentes</h1>
           </div>
           <div className="mission-header-actions">
-            <button className="new-mandate-button" onClick={() => { if (window.confirm("¿Salir y crear un nuevo permiso? Se limpiará la vista actual.")) onCreateNew(); }} disabled={busy !== null} type="button">+ EMPEZAR DE NUEVO</button>
+            <button className="new-mandate-button" onClick={() => { if (window.confirm("Leave and create a new permission? The current view will be cleared.")) onCreateNew(); }} disabled={busy !== null} type="button">+ START OVER</button>
             <button className="refresh-button" onClick={() => void resetMission()} disabled={busy !== null} type="button">
-              {busy === "resetting" ? "REINICIANDO…" : "↻ REINICIAR VISTA"}
+              {busy === "resetting" ? "RESETTING…" : "↻ RESET VIEW"}
             </button>
           </div>
         </header>
 
-        {error && <div className="connection-error" role="alert"><strong>No hay conexión con el sistema.</strong> {error} Comprueba que FastAPI esté activo en el puerto 8000.</div>}
+        {error && <div className="connection-error" role="alert"><strong>Something went wrong.</strong> {error} Check that FastAPI is running on port 8000.</div>}
         <AnimatePresence>
           {toast && <motion.div className={`push-toast toast-${toast.tone}`} key={toast.id} initial={{ opacity: 0, x: 72, y: -10 }} animate={{ opacity: 1, x: 0, y: 0 }} exit={{ opacity: 0, x: 72, y: -10 }} transition={{ type: "spring", stiffness: 330, damping: 28 }} role="status">{toast.message}</motion.div>}
         </AnimatePresence>
@@ -349,73 +343,120 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
         <section className="mandate-panel">
           <div className="mandate-heading">
             <div>
-              <p className="panel-eyebrow">MANDATO ACTIVO · {mandate?.mandate.human?.name ?? "MARTA"}</p>
+              <p className="panel-eyebrow">ACTIVE MANDATE · {mandate?.mandate.human?.name ?? "MARTA"}</p>
               <h2>{mandate?.mandate.mandate_id ?? mandateId}</h2>
             </div>
             <span className={`status-pill status-${status}`}>{statusLabel}</span>
           </div>
           <div className="limit-grid">
-            <div><span>MÁX. POR COMPRA</span><strong>{amount(constraints.max_amount_per_purchase, constraints.currency)}</strong></div>
-            <div><span>CATEGORÍA</span><strong>{constraints.allowed_categories?.[0] ? displayName(constraints.allowed_categories[0]) : "—"}</strong></div>
-            <div><span>COMERCIO</span><strong>{constraints.allowed_merchants?.[0] ? displayName(constraints.allowed_merchants[0]) : "—"}</strong></div>
-            <div><span>USOS</span><strong>{mandate ? `${mandate.live_state.uses_count}/${constraints.max_uses ?? "—"}` : "—"}</strong></div>
-            <div><span>CONDICIÓN</span><strong>precio &lt; {amount(priceLimit, constraints.currency)}</strong></div>
+            <div><span>MAX PER PURCHASE</span><strong>{amount(constraints.max_amount_per_purchase, constraints.currency)}</strong></div>
+            <div><span>CATEGORY</span><strong>{constraints.allowed_categories?.[0] ? displayName(constraints.allowed_categories[0]) : "—"}</strong></div>
+            <div><span>MERCHANT</span><strong>{constraints.allowed_merchants?.[0] ? displayName(constraints.allowed_merchants[0]) : "—"}</strong></div>
+            <div><span>USES</span><strong>{mandate ? `${mandate.live_state.uses_count}/${constraints.max_uses ?? "—"}` : "—"}</strong></div>
+            <div><span>CONDITION</span><strong>price &lt; {amount(priceLimit, constraints.currency)}</strong></div>
           </div>
         </section>
 
         <section className="control-grid">
           <aside className="side-panel flights-panel">
-            <div className="panel-title"><span>VUELOS DESCUBIERTOS</span><small>{flights.length} {searchFellBack ? "CATÁLOGO DEMO" : "EN CATÁLOGO"}</small></div>
-            {searchFellBack && (
-              <p className="search-fallback-note" role="status">
-                ⚠ La búsqueda web no encontró ofertas para <b>{searchFellBack}</b>. Saturday usó el catálogo demo (BUE→COR) — estos NO son la ruta que pediste.
+            <div className="panel-title"><span>SATURDAY'S SEARCH</span><small>{phase === "discovering" ? "SEARCHING" : activity?.selected_flight ? "CHOICE MADE" : noOffers ? "NO RESULTS" : flights.length ? "EVALUATING" : "STANDING BY"}</small></div>
+
+            {phase === "discovering" && (
+              <div className="search-live" role="status">
+                <span className="search-pulse" aria-hidden="true" />
+                <p>Saturday is searching for real flights on the web…<br /><small>This can take up to a minute.</small></p>
+              </div>
+            )}
+
+            {phase !== "discovering" && noOffers && (
+              <p className="no-offers-note" role="status">
+                Saturday couldn't find flights right now — try again.
               </p>
             )}
-            <div className="flight-list">
-              {flights.map((flight, index) => {
-                const isEvaluating = phase === "evaluating" || phase === "choosing" || phase === "verifying";
-                const passesLimit = flight.price <= (constraints.max_amount_per_purchase ?? Number.POSITIVE_INFINITY)
-                  && flight.price < (priceLimit ?? Number.POSITIVE_INFINITY);
-                const isChosen = chosenFlightId === flight.id;
-                return (
-                  <motion.article
-                    className={`flight-card ${scannedFlight === index ? "flight-scanning" : ""} ${isEvaluating ? (passesLimit ? "flight-eligible" : "flight-ineligible") : ""} ${isChosen ? "flight-chosen" : ""}`}
-                    key={flight.id}
-                    animate={scannedFlight === index ? { scale: [1, 1.035, 1] } : { scale: 1 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <div><p>{flight.route}</p><span>{displayName(flight.id)}</span>{isEvaluating && <em>{passesLimit ? "dentro del límite" : `excede ${amount(evaluationLimit, constraints.currency)}`}</em>}{isChosen && <em className="chosen-label">elegido por Saturday</em>}</div>
-                    <div className="flight-price">
-                      <strong>{amount(flight.price)}</strong>
-                      {flight.source && <small className="flight-source">{flight.source === "web" ? "búsqueda web" : "catálogo demo"}</small>}
+
+            {/* Momento héroe: la elección de Saturday, una sola tarjeta protagonista. */}
+            {phase === "idle" && activity?.selected_flight && (() => {
+              const chosen = activity.selected_flight;
+              if (!chosen) return null;
+              const others = flights.filter((flight) => flight.id !== chosen.id);
+              const verdict = verification?.verdict ?? activity.verification?.verdict;
+              const heroBadge = activity.purchase_completed
+                ? { tone: "approve", text: "✓ Purchased" }
+                : verdict === "ESCALATE"
+                  ? { tone: "escalate", text: "⏸ Waiting for your approval" }
+                  : verdict === "APPROVE"
+                    ? { tone: "approve", text: "✓ Approved" }
+                    : { tone: "reject", text: "✕ Blocked" };
+              const withinLimit = chosen.price < (priceLimit ?? Number.POSITIVE_INFINITY)
+                && chosen.price <= (constraints.max_amount_per_purchase ?? Number.POSITIVE_INFINITY);
+              return (
+                <>
+                  <motion.article className="flight-hero" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
+                    <p className="hero-kicker">SATURDAY PICKED THIS FLIGHT FOR YOU</p>
+                    <div className="hero-main">
+                      <strong className="hero-route">{chosen.route.replace("->", " → ")}</strong>
+                      <strong className="hero-price">{amount(chosen.price)}</strong>
                     </div>
+                    <p className="hero-merchant">{merchantName(chosen)}{chosen.details ? ` · ${chosen.details}` : ""}</p>
+                    <p className="hero-reason">{withinLimit ? "The cheapest option that meets your price condition." : "No option met your limit; it attempted the cheapest one available."}</p>
+                    <span className={`hero-badge badge-${heroBadge.tone}`}>{heroBadge.text}</span>
                   </motion.article>
-                );
-              })}
-              {!flights.length && <p className="empty-copy">Esperando el catálogo de VuelaYa…</p>}
-            </div>
+                  {others.length > 0 && (
+                    <div className="other-options">
+                      <p className="other-options-title">Other options Saturday found</p>
+                      {others.map((flight) => (
+                        <div className="other-option" key={flight.id}>
+                          <span>{merchantName(flight)}{flight.details ? ` · ${flight.details}` : ""}</span>
+                          <b>{amount(flight.price)}</b>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+
+            {/* Mientras evalúa/elige/verifica: las opciones reales, sin protagonismo aún. */}
+            {(phase === "evaluating" || phase === "choosing" || phase === "verifying") && (
+              <div className="flight-list">
+                {flights.map((flight) => {
+                  const passesLimit = flight.price <= (constraints.max_amount_per_purchase ?? Number.POSITIVE_INFINITY)
+                    && flight.price < (priceLimit ?? Number.POSITIVE_INFINITY);
+                  return (
+                    <motion.article className={`flight-card ${passesLimit ? "flight-eligible" : "flight-ineligible"}`} key={flight.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+                      <div><p>{flight.route.replace("->", " → ")}</p><span>{merchantName(flight)}</span><em>{passesLimit ? "within your limit" : `exceeds ${amount(evaluationLimit, constraints.currency)}`}</em></div>
+                      <div className="flight-price"><strong>{amount(flight.price)}</strong></div>
+                    </motion.article>
+                  );
+                })}
+              </div>
+            )}
+
+            {phase === "idle" && !activity && !noOffers && (
+              <p className="empty-copy">{status === "revoked" ? "Mandate revoked — you can still run the agent to watch the attempt get blocked." : "Run Saturday: it will search for real flights on the web within your permission."}</p>
+            )}
           </aside>
 
           <section className="saturday-command">
-            <p className="agent-label">SATURDAY / AGENTE AUTORIZADO</p>
+            <p className="agent-label">SATURDAY / AUTHORIZED AGENT</p>
             <Saturday state={saturdayState} />
             <p className={`saturday-state state-${saturdayState}`}>{phase !== "idle" ? phaseCopy[phase] : saturdayStateLabel(saturdayState)}</p>
             <div className="action-stack">
               <button className="run-button" onClick={() => void runAgent()} disabled={busy !== null} type="button">
-                {busy === "running" ? "SATURDAY ESTÁ DECIDIENDO…" : "CORRER AGENTE"}
+                {busy === "running" ? "SATURDAY IS DECIDING…" : "RUN AGENT"}
               </button>
               <button className="revoke-button" onClick={() => void revokeMandate()} disabled={busy !== null || status === "revoked"} type="button">
-                {busy === "revoking" ? "REVOCANDO…" : status === "revoked" ? "MANDATO REVOCADO" : "REVOCAR MANDATO"}
+                {busy === "revoking" ? "REVOKING…" : status === "revoked" ? "MANDATE REVOKED" : "REVOKE MANDATE"}
               </button>
             </div>
-            {status === "revoked" && <p className="revoked-run-hint">El mandato está revocado — corre el agente para ver cómo el sistema bloquea el intento.</p>}
+            {status === "revoked" && <p className="revoked-run-hint">The mandate is revoked — run the agent to watch the system block the attempt.</p>}
           </section>
 
           <aside className="side-panel verification-panel">
-            <div className="panel-title"><span>PANEL DE VERIFICACIÓN</span><small>{displayedVerification ? (phase === "verifying" ? "ESCANEANDO" : "ÚLTIMO INTENTO") : "EN ESPERA"}</small></div>
+            <div className="panel-title"><span>VERIFICATION PANEL</span><small>{displayedVerification ? (phase === "verifying" ? "SCANNING" : "LAST ATTEMPT") : "STANDING BY"}</small></div>
             {displayedVerification ? (
               <>
-                {phase === "verifying" ? <div className="verdict verdict-scanning">VERIFICANDO</div> : <div className={`verdict verdict-${displayedVerification.verdict.toLowerCase()}`}>{verdictLabel(displayedVerification.verdict)}</div>}
+                {phase === "verifying" ? <div className="verdict verdict-scanning">VERIFYING</div> : <div className={`verdict verdict-${displayedVerification.verdict.toLowerCase()}`}>{verdictLabel(displayedVerification.verdict)}</div>}
                 <div className="checks-list">
                   <AnimatePresence initial={false}>
                   {displayedChecks.map((check, index) => (
@@ -427,34 +468,34 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
                 </div>
                 {verification?.verdict === "ESCALATE" && escalatedAttemptId && phase === "idle" && (
                   <div className="human-review">
-                    <p>⚠ Escalada — nunca se aprueba en silencio. Tú decides:</p>
+                    <p>⚠ Escalated — nothing is approved silently. You decide:</p>
                     <div className="human-review-actions">
                       <button className="human-approve" disabled={busy !== null} onClick={() => void reviewEscalation("approve")} type="button">
-                        {busy === "reviewing" ? "REGISTRANDO…" : "✓ APROBAR"}
+                        {busy === "reviewing" ? "RECORDING…" : "✓ APPROVE"}
                       </button>
                       <button className="human-decline" disabled={busy !== null} onClick={() => void reviewEscalation("decline")} type="button">
-                        ✕ RECHAZAR
+                        ✕ DECLINE
                       </button>
                     </div>
                   </div>
                 )}
                 {verification && phase === "idle" && <div className="result-links">
-                  {verification.verdict === "APPROVE" && <button onClick={() => onNavigate("account")} type="button">✓ Compra registrada — verla en Mis compras</button>}
-                  <button onClick={() => onNavigate("audit")} type="button">Este intento quedó en el registro — ver en Auditoría →</button>
+                  {verification.verdict === "APPROVE" && <button onClick={() => onNavigate("account")} type="button">✓ Purchase recorded — see it in My purchases</button>}
+                  <button onClick={() => onNavigate("audit")} type="button">This attempt is on the record — view in Audit →</button>
                 </div>}
               </>
-            ) : <p className="empty-copy">{status === "revoked" ? "Mandato revocado — corre el agente para ver el resultado real del siguiente intento." : "Corre a Saturday para ver los checks reales del backend."}</p>}
+            ) : <p className="empty-copy">{status === "revoked" ? "Mandate revoked — run the agent to see the real outcome of the next attempt." : "Run Saturday to see the backend's real checks."}</p>}
           </aside>
         </section>
 
         <section className="activity-panel">
-          <div className="panel-title"><span>ACTIVIDAD DEL AGENTE</span><small>{activity ? "REGISTRO REAL" : "SIN EJECUCIONES"}</small></div>
+          <div className="panel-title"><span>AGENT ACTIVITY</span><small>{activity ? "REAL RECORD" : "NO RUNS YET"}</small></div>
           {activity ? (
             <div className="activity-content">
-              <p>{localizedText(activity.human_readable ?? activity.verification?.human_readable ?? "Saturday terminó su evaluación.")}</p>
-              {activity.selected_flight && <span>Intento: <b>{activity.selected_flight.route}</b> · {amount(activity.selected_flight.price)} · {activity.purchase_completed ? "compra completada" : "compra no procedió"}</span>}
+              <p>{localizedText(activity.human_readable ?? activity.verification?.human_readable ?? "Saturday finished its evaluation.")}</p>
+              {activity.selected_flight && <span>Attempt: <b>{activity.selected_flight.route}</b> · {amount(activity.selected_flight.price)} · {activity.purchase_completed ? "purchase completed" : "purchase did not proceed"}</span>}
             </div>
-          ) : <p className="empty-copy">{status === "revoked" ? "El mandato fue revocado. El próximo intento del agente quedará registrado aquí." : "La narración de descubrimiento y decisión aparecerá aquí."}</p>}
+          ) : <p className="empty-copy">{status === "revoked" ? "The mandate was revoked. The agent's next attempt will be recorded here." : "The discovery-and-decision story will appear here."}</p>}
         </section>
       </div>
     </main>
@@ -471,12 +512,12 @@ function App() {
 
   return (
     <>
-      <nav className="app-nav" aria-label="Navegación principal">
+      <nav className="app-nav" aria-label="Main navigation">
         <button className="nav-brand" onClick={() => setView("mission")} type="button"><span>Saturday</span><small>by AgentBuyer</small></button>
         <div className="nav-links">
           <button className={view === "mission" ? "is-active" : ""} onClick={() => setView("mission")} type="button">Mission Control</button>
-          <button className={view === "account" ? "is-active" : ""} onClick={() => setView("account")} type="button">Mis compras</button>
-          <button className={view === "audit" ? "is-active" : ""} onClick={() => setView("audit")} type="button">Auditoría</button>
+          <button className={view === "account" ? "is-active" : ""} onClick={() => setView("account")} type="button">My purchases</button>
+          <button className={view === "audit" ? "is-active" : ""} onClick={() => setView("audit")} type="button">Audit</button>
         </div>
       </nav>
       {view === "mission" && <MissionControl mandateId={activeMandateId} onCreateNew={() => setActiveMandateId(null)} onNavigate={setView} />}

@@ -9,11 +9,11 @@ type SaturdayProps = {
 };
 
 const stateCopy: Record<SaturdayState, string> = {
-  idle: "SATURDAY · EN ESPERA",
-  thinking: "SATURDAY · ANALIZANDO",
-  approve: "SATURDAY · AUTORIZADA",
-  escalate: "SATURDAY · REQUIERE HUMANO",
-  reject: "SATURDAY · BLOQUEADA",
+  idle: "SATURDAY · STANDING BY",
+  thinking: "SATURDAY · ANALYZING",
+  approve: "SATURDAY · AUTHORIZED",
+  escalate: "SATURDAY · NEEDS HUMAN",
+  reject: "SATURDAY · BLOCKED",
 };
 
 const palette: Record<SaturdayState, string> = {

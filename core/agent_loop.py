@@ -15,7 +15,7 @@ from shared.schemas import (
     ActorType,
 )
 from mandate.sign import sign_payload
-from core.merchant import vuelaya_merchant, VuelaYaMerchant, get_flights
+from core.merchant import vuelaya_merchant, VuelaYaMerchant
 from core.mandate_store import VERIFICATION_EVENTS, get_mandate
 from audit.log import audit_ledger, append_entry
 from core.merchant_search import _merchant_slug, search_merchant_offers
@@ -115,10 +115,11 @@ class PurchasingAgent:
 
 
 def _discover_flights(search_fields: dict | None) -> tuple[list[dict], str]:
-    """Descubre vuelos: búsqueda web real si hay campos; mock como respaldo.
+    """Descubre vuelos SOLO con búsqueda web real (sin catálogo demo).
 
-    El mock (catálogo VuelaYa) queda como fallback deliberado: si la búsqueda
-    real falla o no hay red (wifi de conferencia), la demo sigue funcionando.
+    Si no hay campos de búsqueda o la búsqueda no devuelve ofertas, regresa
+    una lista vacía: el llamador informa "no encontré vuelos" en vez de
+    inventar datos de un catálogo falso.
     """
     if isinstance(search_fields, dict) and search_fields:
         offers = search_merchant_offers("flights", search_fields)
@@ -139,13 +140,7 @@ def _discover_flights(search_fields: dict | None) -> tuple[list[dict], str]:
                 for index, offer in enumerate(offers)
             ]
             return flights, "web"
-    mock_flights = [
-        flight | {"source": "mock", "merchant": "VuelaYa"}
-        for flight in get_flights()
-        # El catálogo ahora trae también hoteles; este agente compra vuelos.
-        if flight.get("category") == "travel.flights"
-    ]
-    return mock_flights, "mock"
+    return [], "web"
 
 
 def _price_limit(mandate: dict) -> int | float | None:
@@ -174,14 +169,43 @@ def _price_limit(mandate: dict) -> int | float | None:
 def run_agent(mandate_id: str, search_fields: dict | None = None) -> dict:
     """Descubre, decide, intenta y registra el resultado de una compra.
 
-    Con search_fields ({origin, destination, departure_date, ...}) descubre
-    ofertas REALES vía web search; sin ellos (o si la búsqueda falla) usa el
-    catálogo mock de VuelaYa, como siempre.
+    Descubre ofertas REALES vía web search con search_fields ({origin,
+    destination, departure_date, ...}); si el llamador no los pasa, usa los
+    guardados en el mandato. Sin resultados reales NO hay compra: se informa
+    "no encontré vuelos" (no existe ya un catálogo demo de respaldo).
     """
-    flights_seen, discovery_source = _discover_flights(search_fields)
     record = get_mandate(mandate_id)
     mandate = record["mandate"] if record is not None else {}
+    if not search_fields:
+        stored_fields = mandate.get("search_fields")
+        if isinstance(stored_fields, dict) and stored_fields:
+            search_fields = stored_fields
+
+    flights_seen, discovery_source = _discover_flights(search_fields)
     limit = _price_limit(mandate)
+
+    if not flights_seen:
+        message = (
+            "Saturday no encontró vuelos en este momento. "
+            "No se realizó ningún intento de compra; intenta de nuevo."
+        )
+        append_entry(
+            {
+                "type": "agent_run",
+                "mandate_id": mandate_id,
+                "summary": "La búsqueda web no devolvió vuelos; el agente no intentó ninguna compra.",
+            }
+        )
+        return {
+            "mandate_id": mandate_id,
+            "attempt_id": None,
+            "discovery_source": discovery_source,
+            "flights_seen": [],
+            "selected_flight": None,
+            "no_offers": True,
+            "purchase_completed": False,
+            "human_readable": message,
+        }
 
     eligible = [flight for flight in flights_seen if limit is not None and flight["price"] <= limit]
     selected_flight = min(eligible or flights_seen, key=lambda flight: flight["price"])
@@ -222,11 +246,10 @@ def run_agent(mandate_id: str, search_fields: dict | None = None) -> dict:
         }
     )
 
-    source_label = "en la web (búsqueda real)" if discovery_source == "web" else "en el catálogo demo"
     story = (
-        f"Encontró {len(flights_seen)} vuelos {source_label}. "
+        f"Encontró {len(flights_seen)} vuelos en la web (búsqueda real). "
         + (f"Aplicó el límite price_below de {limit} USD y " if limit is not None else "No encontró un límite price_below utilizable y ")
-        + f"eligió {selected_flight['id']} ({selected_flight['route']}) por {selected_flight['price']} USD. "
+        + f"eligió {selected_flight['route']} de {selected_flight.get('merchant', selected_flight['merchant_id'])} por {selected_flight['price']} USD. "
         + ("La compra fue completada tras recibir APPROVE." if completed else f"La compra no procedió: verify devolvió {verdict}. {verification.get('human_readable', '')}")
     )
     

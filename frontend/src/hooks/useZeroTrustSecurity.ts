@@ -89,7 +89,7 @@ export function useZeroTrustSecurity() {
 
     try {
       if (!window.PublicKeyCredential) {
-        throw new Error("WebAuthn / Passkeys no están soportadas en este navegador o entorno.");
+        throw new Error("WebAuthn / Passkeys are not supported in this browser or environment.");
       }
 
       const challenge = new Uint8Array(32);
@@ -128,14 +128,14 @@ export function useZeroTrustSecurity() {
       });
 
       if (!credential) {
-        throw new Error("No se pudo completar el desafío biométrico WebAuthn.");
+        throw new Error("Couldn't complete the WebAuthn biometric challenge.");
       }
 
       setIsPasskeyVerified(true);
       setIsLoading(false);
       return true;
     } catch (err: any) {
-      const errorStr = err?.message || "Error al autenticar con Passkey / Biometría de plataforma.";
+      const errorStr = err?.message || "Error authenticating with Passkey / platform biometrics.";
       setErrorMessage(errorStr);
       setIsPasskeyVerified(false);
       setIsLoading(false);
@@ -150,7 +150,7 @@ export function useZeroTrustSecurity() {
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("La API de captura de medios (getUserMedia) no está disponible en este dispositivo.");
+        throw new Error("The media capture API (getUserMedia) is not available on this device.");
       }
 
       if (streamRef.current) {
@@ -185,7 +185,7 @@ export function useZeroTrustSecurity() {
       setIsLoading(false);
       return stream;
     } catch (err: any) {
-      const errorStr = err?.message || "No se pudo acceder a la cámara para la prueba de vida.";
+      const errorStr = err?.message || "Couldn't access the camera for the liveness check.";
       setErrorMessage(errorStr);
       setIsLoading(false);
       throw new Error(errorStr);
@@ -208,7 +208,7 @@ export function useZeroTrustSecurity() {
 
     const video = videoRef.current;
     if (!video || video.readyState < 2) {
-      const errStr = "El flujo de video no está listo para evaluar la prueba de vida.";
+      const errStr = "The video stream is not ready to evaluate the liveness check.";
       setErrorMessage(errStr);
       setIsLoading(false);
       throw new Error(errStr);
@@ -224,7 +224,7 @@ export function useZeroTrustSecurity() {
 
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       if (!ctx) {
-        throw new Error("No se pudo instanciar el contexto gráfico 2D del canvas.");
+        throw new Error("Couldn't create the canvas 2D graphics context.");
       }
 
       ctx.drawImage(video, 0, 0, width, height);
@@ -304,7 +304,7 @@ export function useZeroTrustSecurity() {
       setIsLoading(false);
       return result;
     } catch (err: any) {
-      const errorStr = err?.message || "No fue posible enviar el código de verificación.";
+      const errorStr = err?.message || "Couldn't send the verification code.";
       setErrorMessage(errorStr);
       setIsLoading(false);
       throw err;
@@ -317,7 +317,7 @@ export function useZeroTrustSecurity() {
 
     const cleanCode = code.trim();
     if (!/^\d{6}$/.test(cleanCode)) {
-      const errStr = "El código OTP debe constar de 6 dígitos numéricos.";
+      const errStr = "The OTP code must be exactly 6 digits.";
       setErrorMessage(errStr);
       setIsLoading(false);
       throw new Error(errStr);
@@ -337,7 +337,7 @@ export function useZeroTrustSecurity() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || "401 Unauthorized: Código incorrecto o expirado.");
+        throw new Error(errorData.detail || "401 Unauthorized: Incorrect or expired code.");
       }
 
       const result = await response.json();
@@ -347,9 +347,9 @@ export function useZeroTrustSecurity() {
         return true;
       }
 
-      throw new Error("El código no pudo ser verificado satisfactoriamente.");
+      throw new Error("The code couldn't be verified.");
     } catch (err: any) {
-      const errorStr = err?.message || "Código incorrecto o expirado.";
+      const errorStr = err?.message || "Incorrect or expired code.";
       setErrorMessage(errorStr);
       setIsPossessionVerified(false);
       setIsLoading(false);
@@ -373,7 +373,7 @@ export function useZeroTrustSecurity() {
               const script = document.createElement("script");
               script.src = "https://js.stripe.com/v3/";
               script.onload = () => resolve();
-              script.onerror = () => reject(new Error("No se pudo cargar Stripe.js"));
+              script.onerror = () => reject(new Error("Couldn't load Stripe.js"));
               document.head.appendChild(script);
             });
           }
@@ -420,7 +420,7 @@ export function useZeroTrustSecurity() {
       setIsLoading(false);
       return generatedToken;
     } catch (err: any) {
-      const errorStr = err?.message || "Error al tokenizar el método de pago.";
+      const errorStr = err?.message || "Error tokenizing the payment method.";
       setErrorMessage(errorStr);
       setIsStripeTokenized(false);
       setIsLoading(false);
@@ -432,7 +432,7 @@ export function useZeroTrustSecurity() {
   const submitDelegatedMandate = useCallback(async (payload: MandatePayload): Promise<any> => {
     const hasInherency = isPasskeyVerified || isLivenessVerified;
     if (!isStripeTokenized || !hasInherency || !isPossessionVerified) {
-      const securityErr = "403 Forbidden: No se cumplen los factores mínimos de seguridad requeridos (PCI Token + Biometría + Posesión).";
+      const securityErr = "403 Forbidden: The minimum required security factors are not met (PCI Token + Biometrics + Possession).";
       setErrorMessage(securityErr);
       throw new Error(securityErr);
     }

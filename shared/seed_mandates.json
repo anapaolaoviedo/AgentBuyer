@@ -13,6 +13,11 @@
       "display_name": "Saturday"
     },
     "destination": "COR",
+    "search_fields": {
+      "origin": "BUE",
+      "destination": "COR",
+      "departure_date": "2026-09-15"
+    },
     "max_amount_per_tx": 150.0,
     "monthly_limit": 500.0,
     "currency": "USD",
