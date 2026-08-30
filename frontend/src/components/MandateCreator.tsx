@@ -27,7 +27,16 @@ const categories = [
   { value: "digital.subscriptions", label: "Subscriptions" },
 ];
 
-const merchants = [{ value: "mch_vuelaya", label: "VuelaYa" }];
+const merchants = [
+  { value: "mch_vuelaya", label: "VuelaYa" },
+  { value: "mch_despegar", label: "Despegar" },
+  { value: "mch_kayak", label: "Kayak" },
+  { value: "mch_expedia", label: "Expedia" },
+];
+
+// La búsqueda web real devuelve ofertas de estos sitios de viajes; un mandato
+// de vuelos debe permitirlos o toda compra real escalaría por comercio.
+const FLIGHT_SEARCH_MERCHANTS = ["mch_vuelaya", "mch_despegar", "mch_kayak", "mch_expedia"];
 
 function endOfMonth() {
   const now = new Date();
@@ -289,7 +298,9 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
         max_amount_per_purchase: amount,
         currency: "USD",
         allowed_categories: [category],
-        allowed_merchants: [merchant],
+        allowed_merchants: category === "travel.flights"
+          ? Array.from(new Set([merchant, ...FLIGHT_SEARCH_MERCHANTS]))
+          : [merchant],
         max_uses: uses,
         conditions: [{ type: "price_below", value: price }],
         off_session_consent: true,
@@ -380,7 +391,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
             <label>How much can it spend at most per purchase?<div className="money-field"><span>USD $</span><input value={maxAmount} onChange={(event) => setMaxAmount(event.target.value)} inputMode="decimal" placeholder="150" required /></div></label>
             <div className="form-pair">
               <label>What can it spend on?<select value={category} onChange={(event) => setCategory(event.target.value)}><option value="" disabled>Choose a category…</option>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-              <label>At which merchants?<select value={merchant} onChange={(event) => setMerchant(event.target.value)}><option value="" disabled>Choose a merchant…</option>{merchants.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+              <label>At which merchants?<select value={merchant} onChange={(event) => setMerchant(event.target.value)}><option value="" disabled>Choose a merchant…</option>{merchants.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>{category === "travel.flights" && <small className="field-hint">For flights, Saturday compares trusted travel sites (VuelaYa, Despegar, Kayak, Expedia) — all included in your permission.</small>}</label>
             </div>
             <div className="form-pair">
               <label>How many purchases at most?<input value={maxUses} onChange={(event) => setMaxUses(event.target.value)} inputMode="numeric" placeholder="3" required /></label>
