@@ -1,8 +1,8 @@
 # 🛡️ AgentBuyer // Safe Agentic Purchasing Protocol
 
-[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/)
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.32-FF4B4B.svg?logo=streamlit)](https://streamlit.io)
+[![React](https://img.shields.io/badge/React%20%2B%20Vite-TypeScript-61DAFB.svg?logo=react)](https://react.dev)
 [![Cryptography](https://img.shields.io/badge/Cryptography-Ed25519-informational.svg)](https://cryptography.io)
 [![Trial by Fire](https://img.shields.io/badge/Trial%20by%20Fire-PASSED-success.svg)](#the-trial-by-fire)
 [![Adversarial Defense](https://img.shields.io/badge/Adversarial%20Tests-8%2F8%20Blocked-brightgreen.svg)](#adversarial-security-suite)
@@ -85,19 +85,28 @@ source .venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Real web search (flight/hotel discovery) requires an OpenAI key:
+echo "OPENAI_API_KEY=sk-..." > .env
 ```
 
-### 2. Launch the Interactive Multi-Perspective Dashboard
+### 2. Launch the API Server (Backend)
 ```bash
-streamlit run demo/app.py
-```
-Open your browser at `http://localhost:8501`.
-
-### 3. Launch the RESTful API Server
-```bash
-uvicorn api.main:app --reload --port 8000
+uvicorn api.main:app --port 8000
 ```
 API Documentation (Swagger UI): `http://localhost:8000/docs`
+
+### 3. Launch the Mission Control UI (Frontend)
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open your browser at `http://localhost:5173`.
+
+> **Note:** the agent discovers **real, live offers** via web search — there is no
+> mock catalog. Without network access / `OPENAI_API_KEY`, the agent honestly
+> reports "no offers found" instead of inventing data.
 
 ---
 
@@ -157,20 +166,32 @@ During the hackathon defense, judges will operate the system live. Here is the e
 - **Merchant:** VuelaYa (Online Travel Agency).
 - **Buyer:** Marta authorizes her personal agent: *"Buy me a flight to Córdoba if it drops below \$150, valid until the end of the month"*.
 
-1. **Step 1 — Autonomous Purchase within Limits:**
-   - Open Tab 2 (Agent Workspace) $\rightarrow$ Select Flight to Córdoba (\$130).
-   - Click **"Autonomous Buy"** $\rightarrow$ Approved & settled immediately. Marta gets receipt; VuelaYa gets cryptographic verification.
-2. **Step 2 — Escalation for Out-of-Bounds Deal:**
-   - Select Flight to Córdoba Express (\$300).
-   - Click **"Autonomous Buy"** $\rightarrow$ Status changes to `ESCALATED_HITL`.
-   - Open Tab 1 (Human Portal) $\rightarrow$ Marta sees the pending request and can 1-Click **"Approve"** or **"Deny"**.
+1. **Step 1 — Issue the Mandate (Enrollment):**
+   - The wizard walks Marta through identity + biometrics, card tokenization
+     (the agent never sees the raw card), and her verifiable limits.
+   - Click **"AUTHORIZE SATURDAY"** — the signed mandate is issued and logged.
+2. **Step 2 — Autonomous Discovery & Human-in-the-Loop:**
+   - Click **"RUN AGENT"** — Saturday searches **real, live fares** on the web
+     (takes 30–60s) and picks the cheapest offer that satisfies the price
+     condition.
+   - If the best real offer satisfies **every** rule, it buys autonomously.
+   - If any rule is not met 100% — e.g. the offer comes from a merchant outside
+     the mandate, or exceeds the price cap — the verdict is `ESCALATE`: the
+     purchase stops and **Marta decides** with 1-click **Approve** / **Decline**.
+     Nothing is ever approved silently.
 3. **Step 3 — The Trial by Fire (Live Revocation):**
-   - In Tab 1, click **"🚨 Revoke Mandate (Trial by Fire)"**.
-   - Return to Tab 2 and attempt to buy the \$130 flight.
-   - 💥 **Outcome:** Instant fail-closed rejection: `403 Forbidden: Mandate is REVOKED`. Zero delays, zero caching leaks.
+   - Click **"REVOKE MANDATE"** (judges are welcome to click it themselves).
+   - Click **"RUN AGENT"** again.
+   - 💥 **Outcome:** instant fail-closed rejection — mandate revoked. Zero
+     delays, zero caching leaks, no team intervention.
 4. **Step 4 — Chargeback Dispute Arbitration:**
-   - In Tab 4 (Auditor Court), file a dispute for any transaction.
-   - The automated engine replays the Merkle chain and deterministically rules whether Human, Agent, or Merchant is liable in < 1 second.
+   - Open **"My purchases"** → click **"⚖ I don't recognize this charge"** on
+     any completed purchase.
+   - The arbiter replays the hash-chained audit trail and deterministically
+     rules whether Human, Agent, or Merchant is liable — with the evidence shown.
+5. **Step 5 — The Full Story:**
+   - Open **"Audit"** — every decision above is in the append-only, SHA-256
+     hash-chained trail, readable by human, merchant, and auditor.
 
 ---
 
