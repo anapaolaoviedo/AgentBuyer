@@ -27,6 +27,7 @@ from core.mandate_store import (
     create_mandate as store_create_mandate,
     get_mandate as store_get_mandate,
     revoke_mandate as store_revoke_mandate,
+    reset_mandate,
 )
 from core.merchant import vuelaya_merchant, get_flights
 from core.agent_loop import PurchasingAgent, run_agent
@@ -422,6 +423,15 @@ def api_pause_mandate(mandate_id: str):
     if not success:
         raise HTTPException(status_code=404, detail="Mandate not found")
     return {"status": "PAUSED", "mandate_id": mandate_id}
+
+
+@app.post("/mandates/{mandate_id}/reset")
+def reset_mandate_endpoint(mandate_id: str):
+    """Restaura el mandato a un estado vivo fresco para reiniciar la demo."""
+    record = reset_mandate(mandate_id)
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mandato no encontrado.")
+    return record
 
 
 @app.post("/mandates/{mandate_id}/resume")

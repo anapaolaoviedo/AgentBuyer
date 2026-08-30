@@ -193,6 +193,21 @@ def revoke_mandate(mandate_id: str) -> dict | None:
     return get_mandate(mandate_id)
 
 
+def reset_mandate(mandate_id: str) -> dict | None:
+    """Restaura el estado vivo inicial de un mandato para reiniciar una demo."""
+    record = MANDATES.get(mandate_id)
+    if record is None:
+        return None
+
+    record["live_state"] = {
+        "status": "active",
+        "uses_count": 0,
+        "amount_spent": 0,
+        "revoked_at": None,
+    }
+    return get_mandate(mandate_id)
+
+
 def apply_approved_purchase(mandate_id: str, amount: int | float) -> dict | None:
     record = MANDATES.get(mandate_id)
     if record is None:

@@ -4,6 +4,7 @@ import Saturday, { type SaturdayState } from "./components/Saturday";
 import MandateCreator from "./components/MandateCreator";
 import AccountView from "./components/AccountView";
 import AuditView from "./components/AuditView";
+import { checkDetailLabel, checkRuleLabel, displayName, localizedText, saturdayStateLabel, verdictLabel } from "./lib/presentation";
 
 const API_BASE = "http://127.0.0.1:8000";
 
@@ -55,6 +56,8 @@ type AgentRun = {
   purchase_completed?: boolean;
 };
 
+type Toast = { id: number; tone: "approve" | "escalate" | "reject"; message: string };
+
 type DecisionPhase = "idle" | "discovering" | "evaluating" | "choosing" | "verifying";
 type AppView = "mission" | "account" | "audit";
 
@@ -87,6 +90,18 @@ function wait(milliseconds: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
+function toastFor(run: AgentRun, result: Verification): Omit<Toast, "id"> {
+  const flight = run.selected_flight;
+  const purchaseAmount = flight?.price;
+  const merchant = flight?.merchant_id ? displayName(flight.merchant_id) : "el comercio";
+  if (result.verdict === "APPROVE") return { tone: "approve", message: `💳 Pago aprobado — ${amount(purchaseAmount)} en ${merchant}` };
+  if (result.verdict === "ESCALATE") return { tone: "escalate", message: `⏸ Requiere tu aprobación — ${amount(purchaseAmount)} en ${merchant}` };
+  const revoked = result.checks.some((check) => check.rule === "status" && !check.pass && check.detail.toLowerCase().includes("revocado"));
+  return revoked
+    ? { tone: "reject", message: "🔒 Pago bloqueado — mandato revocado" }
+    : { tone: "reject", message: "⚠ Intento bloqueado — verificación fallida" };
+}
+
 type MissionControlProps = {
   mandateId: string;
   onCreateNew: () => void;
@@ -100,8 +115,9 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
   const [pendingVerification, setPendingVerification] = useState<Verification | null>(null);
   const [activity, setActivity] = useState<AgentRun | null>(null);
   const [saturdayState, setSaturdayState] = useState<SaturdayState>("idle");
-  const [busy, setBusy] = useState<"loading" | "running" | "revoking" | "searching" | "reviewing" | null>("loading");
+  const [busy, setBusy] = useState<"loading" | "running" | "revoking" | "searching" | "reviewing" | "resetting" | null>("loading");
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
   const [phase, setPhase] = useState<DecisionPhase>("idle");
   const [scannedFlight, setScannedFlight] = useState<number | null>(null);
   const [chosenFlightId, setChosenFlightId] = useState<string | null>(null);
@@ -150,6 +166,11 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
   }, [mandateId]);
 
   useEffect(() => { void loadMission(); }, [loadMission]);
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timeout = window.setTimeout(() => setToast(null), 3000);
+    return () => window.clearTimeout(timeout);
+  }, [toast]);
 
   async function searchWeb(event: React.FormEvent) {
     event.preventDefault();
@@ -279,6 +300,7 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
       // Una escalación queda pendiente de la decisión humana (approve/decline).
       setEscalatedAttemptId(result.verdict === "ESCALATE" ? run.attempt_id ?? null : null);
       setSaturdayState(verdictState(result.verdict));
+      setToast({ id: Date.now(), ...toastFor(run, result) });
       const mandateData = await request<MandateRecord>(`/mandates/${mandateId}`);
       setMandate(mandateData);
     } catch (caught) {
@@ -307,6 +329,28 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
       setEscalatedAttemptId(null);
       setPhase("idle");
       setSaturdayState("reject");
+      setToast({ id: Date.now(), tone: "reject", message: "🔒 Mandato revocado — Saturday ya no puede comprar" });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "No hay conexión con el sistema.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function resetMission() {
+    setBusy("resetting");
+    setError(null);
+    try {
+      const record = await request<MandateRecord>(`/mandates/${mandateId}/reset`, { method: "POST" });
+      setMandate(record);
+      setVerification(null);
+      setPendingVerification(null);
+      setActivity(null);
+      setChosenFlightId(null);
+      setRevealedChecks(0);
+      setPhase("idle");
+      setSaturdayState("idle");
+      setToast(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "No hay conexión con el sistema.");
     } finally {
@@ -328,17 +372,20 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
         <header className="mission-header">
           <div>
             <p className="mission-kicker">AGENTBUYER / MISSION CONTROL</p>
-            <h1>Centro de confianza para compras de agentes</h1>
+            <h1>Centro de confianza para agentes</h1>
           </div>
           <div className="mission-header-actions">
             <button className="new-mandate-button" onClick={onCreateNew} disabled={busy !== null} type="button">+ CREAR NUEVO MANDATO</button>
-            <button className="refresh-button" onClick={() => void loadMission(true)} disabled={busy !== null} type="button">
-              {busy === "loading" ? "RECARGANDO…" : "↻ REINICIAR VISTA"}
+            <button className="refresh-button" onClick={() => void resetMission()} disabled={busy !== null} type="button">
+              {busy === "resetting" ? "REINICIANDO…" : "↻ REINICIAR VISTA"}
             </button>
           </div>
         </header>
 
         {error && <div className="connection-error" role="alert"><strong>No hay conexión con el sistema.</strong> {error} Comprueba que FastAPI esté activo en el puerto 8000.</div>}
+        <AnimatePresence>
+          {toast && <motion.div className={`push-toast toast-${toast.tone}`} key={toast.id} initial={{ opacity: 0, x: 72, y: -10 }} animate={{ opacity: 1, x: 0, y: 0 }} exit={{ opacity: 0, x: 72, y: -10 }} transition={{ type: "spring", stiffness: 330, damping: 28 }} role="status">{toast.message}</motion.div>}
+        </AnimatePresence>
 
         <section className="mandate-panel">
           <div className="mandate-heading">
@@ -358,8 +405,8 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
           </div>
           <div className="limit-grid">
             <div><span>MÁX. POR COMPRA</span><strong>{amount(constraints.max_amount_per_purchase, constraints.currency)}</strong></div>
-            <div><span>CATEGORÍA</span><strong>{constraints.allowed_categories?.[0] ?? "—"}</strong></div>
-            <div><span>COMERCIO</span><strong>{constraints.allowed_merchants?.[0] ?? "—"}</strong></div>
+            <div><span>CATEGORÍA</span><strong>{constraints.allowed_categories?.[0] ? displayName(constraints.allowed_categories[0]) : "—"}</strong></div>
+            <div><span>COMERCIO</span><strong>{constraints.allowed_merchants?.[0] ? displayName(constraints.allowed_merchants[0]) : "—"}</strong></div>
             <div><span>USOS</span><strong>{mandate ? `${mandate.live_state.uses_count}/${constraints.max_uses ?? "—"}` : "—"}</strong></div>
             <div><span>CONDICIÓN</span><strong>precio &lt; {amount(priceLimit, constraints.currency)}</strong></div>
           </div>
@@ -398,7 +445,7 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
                     animate={scannedFlight === index ? { scale: [1, 1.035, 1] } : { scale: 1 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <div><p>{flight.route}</p><span title={flight.details}>{flight.merchant ?? flight.id}</span>{isEvaluating && <em>{passesLimit ? "dentro del límite" : `excede ${amount(evaluationLimit, constraints.currency)}`}</em>}{isChosen && <em className="chosen-label">elegido por Saturday</em>}</div>
+                    <div><p>{flight.route}</p><span title={flight.details}>{flight.merchant ?? displayName(flight.id)}</span>{isEvaluating && <em>{passesLimit ? "dentro del límite" : `excede ${amount(evaluationLimit, constraints.currency)}`}</em>}{isChosen && <em className="chosen-label">elegido por Saturday</em>}</div>
                     <strong>{amount(flight.price)}</strong>
                   </motion.article>
                 );
@@ -410,7 +457,7 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
           <section className="saturday-command">
             <p className="agent-label">SATURDAY / AGENTE AUTORIZADO</p>
             <Saturday state={saturdayState} />
-            <p className={`saturday-state state-${saturdayState}`}>{phase !== "idle" ? phaseCopy[phase] : saturdayState.toUpperCase()}</p>
+            <p className={`saturday-state state-${saturdayState}`}>{phase !== "idle" ? phaseCopy[phase] : saturdayStateLabel(saturdayState)}</p>
             <div className="action-stack">
               <button className="run-button" onClick={() => void runAgent()} disabled={busy !== null} type="button">
                 {busy === "running" ? "SATURDAY ESTÁ DECIDIENDO…" : "CORRER AGENTE"}
@@ -419,18 +466,19 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
                 {busy === "revoking" ? "REVOCANDO…" : status === "revoked" ? "MANDATO REVOCADO" : "REVOCAR MANDATO"}
               </button>
             </div>
+            {status === "revoked" && <p className="revoked-run-hint">El mandato está revocado — corre el agente para ver cómo el sistema bloquea el intento.</p>}
           </section>
 
           <aside className="side-panel verification-panel">
             <div className="panel-title"><span>PANEL DE VERIFICACIÓN</span><small>{displayedVerification ? (phase === "verifying" ? "ESCANEANDO" : "ÚLTIMO INTENTO") : "EN ESPERA"}</small></div>
             {displayedVerification ? (
               <>
-                {phase === "verifying" ? <div className="verdict verdict-scanning">VERIFICANDO</div> : <div className={`verdict verdict-${displayedVerification.verdict.toLowerCase()}`}>{displayedVerification.verdict}</div>}
+                {phase === "verifying" ? <div className="verdict verdict-scanning">VERIFICANDO</div> : <div className={`verdict verdict-${displayedVerification.verdict.toLowerCase()}`}>{verdictLabel(displayedVerification.verdict)}</div>}
                 <div className="checks-list">
                   <AnimatePresence initial={false}>
                   {displayedChecks.map((check, index) => (
                     <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} className={`check-row ${check.pass ? "check-pass" : "check-fail"}`} key={`${check.rule}-${index}`}>
-                      <b>{check.pass ? "✓" : "✕"}</b><div><strong>{check.rule}</strong><span>{check.detail}</span></div>
+                      <b>{check.pass ? "✓" : "✕"}</b><div><strong>{checkRuleLabel(check.rule)}</strong><span>{checkDetailLabel(check.rule, check.detail)}</span></div>
                     </motion.div>
                   ))}
                   </AnimatePresence>
@@ -461,7 +509,7 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
           <div className="panel-title"><span>ACTIVIDAD DEL AGENTE</span><small>{activity ? "REGISTRO REAL" : "SIN EJECUCIONES"}</small></div>
           {activity ? (
             <div className="activity-content">
-              <p>{activity.human_readable ?? activity.verification?.human_readable ?? "Saturday terminó su evaluación."}</p>
+              <p>{localizedText(activity.human_readable ?? activity.verification?.human_readable ?? "Saturday terminó su evaluación.")}</p>
               {activity.selected_flight && <span>Intento: <b>{activity.selected_flight.route}</b> · {amount(activity.selected_flight.price)} · {activity.purchase_completed ? "compra completada" : "compra no procedió"}</span>}
             </div>
           ) : <p className="empty-copy">{status === "revoked" ? "El mandato fue revocado. El próximo intento del agente quedará registrado aquí." : "La narración de descubrimiento y decisión aparecerá aquí."}</p>}
