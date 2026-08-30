@@ -310,6 +310,9 @@ def auth_email_start(payload: EmailStartRequest):
         "ok": True,
         "status": "pending",
         "email_hint": f"***{email_addr.split('@')[0][-3:]}@{email_addr.split('@')[1]}" if "@" in email_addr else email_addr,
+        # Igual que el flujo SMS: el código solo se revela cuando NO hubo
+        # entrega real (modo demo, sin SMTP); con SMTP configurado se enmascara.
+        "code_demo": code if sent_via != "smtp" else "******",
         "sent_via": sent_via,
         "message": f"OTP code sent to {email_addr}",
     }

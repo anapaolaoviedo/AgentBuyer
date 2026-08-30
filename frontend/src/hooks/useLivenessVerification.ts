@@ -339,7 +339,7 @@ export function useLivenessVerification() {
         ...prev,
         isVerifying: false,
         isSmsVerified: false,
-        error: err.message || "Incorrect SMS code.",
+        error: err.message || "Incorrect or expired verification code.",
       }));
       throw err;
     }
