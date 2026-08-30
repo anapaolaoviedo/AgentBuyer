@@ -1,17 +1,18 @@
 # AgentBuyer — backend + tests
 # Instalar con:  python -m venv .venv && ./.venv/bin/pip install -r requirements.txt
 
-fastapi>=0.141        # API (api/main.py, api/verify.py, ...)
-uvicorn[standard]>=0.34   # servidor:  uvicorn api.main:app --reload
-pydantic>=2           # modelos (viene con fastapi, se fija por claridad)
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+pydantic>=2.6.0
+cryptography>=42.0.0
+pytest>=8.0.0
+httpx>=0.28.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+streamlit>=1.32.0
 
 # Búsqueda real de ofertas (core/merchant_search.py)
 openai>=1.60
-python-dotenv>=1
+phonenumbers>=8.13.0
+twilio>=9.0.0
 
-# Tests
-pytest>=9
-httpx>=0.28           # requerido por fastapi.testclient en tests/ de integración
-
-# Bonus (descomentar cuando se construya engine/llm_judge.py)
-# anthropic
