@@ -34,8 +34,8 @@ function endOfMonth() {
   return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
 }
 
-// Fecha cercana (~2 semanas) para que la búsqueda web real devuelva resultados
-// de forma confiable — las fechas muy lejanas suelen no tener tarifas publicadas.
+// Fecha cercana (~2 semanas) para que la b├║squeda web real devuelva resultados
+// de forma confiable ÔÇö las fechas muy lejanas suelen no tener tarifas publicadas.
 function nearTermDate() {
   const d = new Date();
   d.setDate(d.getDate() + 14);
@@ -113,13 +113,13 @@ function CalendarDatePicker({ value, onChange, ariaLabel = "Pick a date" }: Cale
   return (
     <div className="date-picker" ref={containerRef}>
       <button className={`date-picker-trigger ${value ? "has-value" : ""}`} type="button" onClick={togglePicker} aria-haspopup="dialog" aria-expanded={isOpen}>
-        <span>{value ? readableDate(value) : "Pick a date"}</span><b aria-hidden="true">⌄</b>
+        <span>{value ? readableDate(value) : "Pick a date"}</span><b aria-hidden="true">Ôîä</b>
       </button>
       {isOpen && <div className="calendar-popover" role="dialog" aria-label={ariaLabel}>
         <div className="calendar-heading">
-          <button type="button" onClick={() => setVisibleMonth(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1))} disabled={visibleMonth <= earliestMonth} aria-label="Previous month">‹</button>
+          <button type="button" onClick={() => setVisibleMonth(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1))} disabled={visibleMonth <= earliestMonth} aria-label="Previous month">ÔÇ╣</button>
           <strong>{monthLabel}</strong>
-          <button type="button" onClick={() => setVisibleMonth(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1))} aria-label="Next month">›</button>
+          <button type="button" onClick={() => setVisibleMonth(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1))} aria-label="Next month">ÔÇ║</button>
         </div>
         <div className="calendar-weekdays">{["S", "M", "T", "W", "T", "F", "S"].map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}</div>
         <div className="calendar-days">
@@ -137,7 +137,7 @@ function CalendarDatePicker({ value, onChange, ariaLabel = "Pick a date" }: Cale
 
 export default function MandateCreator({ onCreated }: MandateCreatorProps) {
   // Prellenado con el perfil demo de Marta: el wizard completo se recorre
-  // solo con clics (sin teclear nada) para una demo rápida y confiable.
+  // solo con clics (sin teclear nada) para una demo r├ípida y confiable.
   const [humanName, setHumanName] = useState("Marta");
   const [maxAmount, setMaxAmount] = useState("150");
   const [category, setCategory] = useState("travel.flights");
@@ -146,23 +146,23 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
   const [priceBelow, setPriceBelow] = useState("150");
   const [validUntil, setValidUntil] = useState(endOfMonth());
   // Estos datos viajan con el permiso para que Saturday pueda buscar la ruta real.
-  // Ruta por defecto BUE→COR con fecha cercana: combinación confirmada que
-  // la búsqueda web real devuelve de forma confiable para la demo.
+  // Ruta por defecto BUEÔåÆCOR con fecha cercana: combinaci├│n confirmada que
+  // la b├║squeda web real devuelve de forma confiable para la demo.
   const [flightOrigin, setFlightOrigin] = useState("BUE");
   const [flightDestination, setFlightDestination] = useState("COR");
   const [departureDate, setDepartureDate] = useState(nearTermDate());
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
 
-  // 🛡️ Identidad y Datos Bancarios DLP (valores demo de Marta, editables)
+  // ­ƒøí´©Å Identidad y Datos Bancarios DLP (valores demo de Marta, editables)
   const [userIdDoc, setUserIdDoc] = useState("PASSPORT-AR-948291");
   const [userPhone, setUserPhone] = useState("+52 56 1447 3083");
   const [userEmail, setUserEmail] = useState("marta@example.com");
-  // Canal del código de verificación: SMS al teléfono o correo electrónico.
+  // Canal del c├│digo de verificaci├│n: SMS al tel├®fono o correo electr├│nico.
   const [otpChannel, setOtpChannel] = useState<"sms" | "email">("sms");
   const [smsOtp, setSmsOtp] = useState("849201");
   const [cardNumber, setCardNumber] = useState("4242 4242 4242 4242");
 
-  // Modal y Hooks Biométicos
+  // Modal y Hooks Biom├®ticos
   const [showBioModal, setShowBioModal] = useState(false);
   const [bioMode, setBioMode] = useState<"camera" | "fingerprint">("camera");
   const [passkeyVerified, setPasskeyVerified] = useState(false);
@@ -184,7 +184,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
 
   const selectedCategory = categories.find((item) => item.value === category)?.label ?? category;
   const selectedMerchant = merchants.find((item) => item.value === merchant)?.label ?? merchant;
-  // Un teléfono real: al menos 10 dígitos (ignorando espacios, guiones, etc.).
+  // Un tel├®fono real: al menos 10 d├¡gitos (ignorando espacios, guiones, etc.).
   const phoneDigits = userPhone.replace(/\D/g, "");
   const phoneComplete = phoneDigits.length >= 10;
   const emailComplete = /^\S+@\S+\.\S+$/.test(userEmail.trim());
@@ -202,7 +202,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
     ? "covering"
     : microExpression ?? (stepOneReady || (currentStep === 2 && tokenVerified) ? "ready" : undefined);
   const summary = useMemo(
-    () => `Saturday will be able to buy ${selectedCategory.toLowerCase()} at ${selectedMerchant}, up to $${maxAmount || "—"} per purchase, at most ${maxUses || "—"} times, only if the price drops below $${priceBelow || "—"}${validUntil ? `, valid until ${validUntil}.` : "."} (Enrolled with Passkey + SMS OTP + DLP Token).`,
+    () => `Saturday will be able to buy ${selectedCategory.toLowerCase()} at ${selectedMerchant}, up to $${maxAmount || "ÔÇö"} per purchase, at most ${maxUses || "ÔÇö"} times, only if the price drops below $${priceBelow || "ÔÇö"}${validUntil ? `, valid until ${validUntil}.` : "."} (Enrolled with Passkey + SMS OTP + DLP Token).`,
     [humanName, maxAmount, maxUses, priceBelow, selectedCategory, selectedMerchant, validUntil],
   );
 
@@ -246,7 +246,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
     const amount = Number(maxAmount);
     const uses = Number(maxUses);
     const price = Number(priceBelow);
-    // Si falta algo del paso 3, regresamos ahí para que el error sea accionable.
+    // Si falta algo del paso 3, regresamos ah├¡ para que el error sea accionable.
     if (!humanName.trim() || !Number.isFinite(amount) || amount <= 0 || !Number.isInteger(uses) || uses <= 0 || !Number.isFinite(price) || price <= 0) {
       setError("Fill in your name and the limits with valid numbers greater than zero.");
       setCurrentStep(3);
@@ -272,7 +272,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
         display_name: humanName.trim(),
         id_document: userIdDoc,
         phone: userPhone,
-        // El recibo de compra se envía a mandate.human.email (core/notifications).
+        // El recibo de compra se env├¡a a mandate.human.email (core/notifications).
         ...(userEmail.trim() ? { email: userEmail.trim() } : {}),
       },
       agent: { id: "agt_saturday", display_name: "Saturday" },
@@ -295,13 +295,15 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
       authentication: {
         passkey_biometrics: passkeyVerified ? "verified_webauthn_touch_id" : "unverified",
         sms_otp_confirmed: smsVerified,
+        email_otp_confirmed: otpChannel === "email" && smsVerified,
         sms_code: smsOtp,
         otp_channel: otpChannel,
+        verified_email: userEmail.trim(),
       },
       payment_token: {
         token_id: paymentMethodId || `vtok_${Math.random().toString(36).slice(2, 10)}`,
         token_type: "SCOPED_VIRTUAL_TOKEN",
-        masked_card: cardNumber ? (cardNumber.startsWith("••••") ? cardNumber : `•••• ${cardNumber.replace(/\D/g, "").slice(-4) || "4242"}`) : "•••• 4242",
+        masked_card: cardNumber ? (cardNumber.startsWith("ÔÇóÔÇóÔÇóÔÇó") ? cardNumber : `ÔÇóÔÇóÔÇóÔÇó ${cardNumber.replace(/\D/g, "").slice(-4) || "4242"}`) : "ÔÇóÔÇóÔÇóÔÇó 4242",
         bank_issuer: "Stripe Elements / Galicia AI Payments",
       },
       ...(validUntil ? { valid_until: validUntil } : {}),
@@ -315,7 +317,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!response.ok) throw new Error(`El sistema respondió ${response.status}.`);
+      if (!response.ok) throw new Error(`El sistema respondi├│ ${response.status}.`);
       onCreated(mandateId);
     } catch (caught) {
       setError(caught instanceof Error ? `We couldn't create your permission: ${caught.message}` : "We couldn't create your permission. Check the connection to the system.");
@@ -328,13 +330,13 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
     <main className="authorization-shell">
       <div className="starfield" aria-hidden="true" />
 
-      {/* Modal Biométrico */}
+      {/* Modal Biom├®trico */}
       {showBioModal && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(10, 14, 26, 0.94)", backdropFilter: "blur(16px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
           <div style={{ width: "min(420px, 94vw)", background: "#141B2E", border: "1px solid rgba(77, 124, 255, 0.4)", borderRadius: "1.5rem", padding: "1.5rem", textAlign: "center", position: "relative" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h2 style={{ margin: 0, fontFamily: "Space Grotesk", fontSize: "1.25rem", color: "#E8ECF5" }}>Face ID & Biometrics</h2>
-              <button type="button" onClick={() => { stopCamera(); setShowBioModal(false); }} style={{ background: "transparent", border: 0, color: "#8A94AD", fontSize: "1.2rem", cursor: "pointer" }}>✕</button>
+              <button type="button" onClick={() => { stopCamera(); setShowBioModal(false); }} style={{ background: "transparent", border: 0, color: "#8A94AD", fontSize: "1.2rem", cursor: "pointer" }}>Ô£ò</button>
             </div>
 
             <div style={{ position: "relative", width: "230px", height: "290px", margin: "1rem auto", borderRadius: "50%", overflow: "hidden", border: "4px solid #3DDC97", boxShadow: "0 0 30px rgba(61, 220, 151, 0.5)", background: "#000" }}>
@@ -343,7 +345,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
             </div>
 
             <p style={{ color: "#3DDC97", fontFamily: "Space Grotesk", fontSize: "0.85rem", fontWeight: 600 }}>
-              {livenessState.error ? livenessState.error : livenessState.isLiveFaceVerified ? "✅ Human verified!" : "Center your face in the oval..."}
+              {livenessState.error ? livenessState.error : livenessState.isLiveFaceVerified ? "Ô£à Human verified!" : "Center your face in the oval..."}
             </p>
           </div>
         </div>
@@ -359,8 +361,8 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
         </div>
 
         {/* noValidate: hay inputs required en pasos ocultos (display:none); la
-            validación nativa bloqueaba el submit sin poder mostrar su burbuja.
-            La validación real vive en createMandate, con errores visibles. */}
+            validaci├│n nativa bloqueaba el submit sin poder mostrar su burbuja.
+            La validaci├│n real vive en createMandate, con errores visibles. */}
         <form className="mandate-form" onSubmit={createMandate} noValidate>
           <div className="form-heading"><p className="panel-eyebrow">NEW PERMISSION</p><h2>Give Saturday clear instructions</h2></div>
           <div className="wizard-progress" aria-label={`Step ${currentStep} of 4`}>
@@ -375,8 +377,8 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
             <label>Who's authorizing?<input value={humanName} onChange={(event) => setHumanName(event.target.value)} placeholder="Your name" required /></label>
             <label>How much can it spend at most per purchase?<div className="money-field"><span>USD $</span><input value={maxAmount} onChange={(event) => setMaxAmount(event.target.value)} inputMode="decimal" placeholder="150" required /></div></label>
             <div className="form-pair">
-              <label>What can it spend on?<select value={category} onChange={(event) => setCategory(event.target.value)}><option value="" disabled>Choose a category…</option>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-              <label>At which merchants?<select value={merchant} onChange={(event) => setMerchant(event.target.value)}><option value="" disabled>Choose a merchant…</option>{merchants.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+              <label>What can it spend on?<select value={category} onChange={(event) => setCategory(event.target.value)}><option value="" disabled>Choose a categoryÔÇª</option>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+              <label>At which merchants?<select value={merchant} onChange={(event) => setMerchant(event.target.value)}><option value="" disabled>Choose a merchantÔÇª</option>{merchants.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
             </div>
             <div className="form-pair">
               <label>How many purchases at most?<input value={maxUses} onChange={(event) => setMaxUses(event.target.value)} inputMode="numeric" placeholder="3" required /></label>
@@ -403,10 +405,10 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
                 <div className="verify-progress-bar" aria-hidden="true"><i style={{ width: `${Math.round((completedVerificationCount / 3) * 100)}%` }} /></div>
               </div>
 
-              {/* a) Identidad: documento + teléfono */}
+              {/* a) Identidad: documento + tel├®fono */}
               <section className={`verify-item is-${identityStatus}`}>
                 <header className="verify-item-heading">
-                  <span className="verify-item-number" aria-hidden="true">{identityComplete ? "✓" : "1"}</span>
+                  <span className="verify-item-number" aria-hidden="true">{identityComplete ? "Ô£ô" : "1"}</span>
                   <div className="verify-item-title"><b>Identity</b><small>{identityComplete ? "Document and phone captured" : "Enter your document and your phone"}</small></div>
                   <em className={`verify-chip is-${identityStatus}`}>{verificationStatusLabel[identityStatus]}</em>
                   {identityComplete && <button className="verify-edit" type="button" onClick={() => setEditingIdentity((editing) => !editing)}>{editingIdentity ? "Done" : "Edit"}</button>}
@@ -428,32 +430,32 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
                 </div>}
               </section>
 
-              {/* b) Biometría: Face ID / huella */}
+              {/* b) Biometr├¡a: Face ID / huella */}
               <section className={`verify-item is-${biometricStatus}`}>
                 <header className="verify-item-heading">
-                  <span className="verify-item-number" aria-hidden="true">{passkeyVerified ? "✓" : "2"}</span>
+                  <span className="verify-item-number" aria-hidden="true">{passkeyVerified ? "Ô£ô" : "2"}</span>
                   <div className="verify-item-title"><b>Biometrics</b><small>{passkeyVerified ? "Identity verified" : "Confirm it's you with your face or fingerprint"}</small></div>
                   <em className={`verify-chip is-${biometricStatus}`}>{verificationStatusLabel[biometricStatus]}</em>
                 </header>
                 {!biometricCollapsed && <div className="verify-item-body">
                   <button className="verify-action" type="button" onClick={openBiometricsModal} disabled={passkeyVerified || showBioModal}>
-                    {showBioModal ? "Verifying…" : "Verify with Face ID / Fingerprint"}
+                    {showBioModal ? "VerifyingÔÇª" : "Verify with Face ID / Fingerprint"}
                   </button>
                 </div>}
               </section>
 
-              {/* c) Código de verificación: por SMS o por correo — enviar y luego verificar */}
+              {/* c) C├│digo de verificaci├│n: por SMS o por correo ÔÇö enviar y luego verificar */}
               <section className={`verify-item is-${smsStatus}`}>
                 <header className="verify-item-heading">
-                  <span className="verify-item-number" aria-hidden="true">{smsVerified ? "✓" : "3"}</span>
+                  <span className="verify-item-number" aria-hidden="true">{smsVerified ? "Ô£ô" : "3"}</span>
                   <div className="verify-item-title"><b>Verification code</b><small>{smsVerified ? `Code verified via ${otpChannel === "email" ? "email" : "SMS"}` : "Receive a code by SMS or email and confirm it"}</small></div>
                   <em className={`verify-chip is-${smsStatus}`}>{verificationStatusLabel[smsStatus]}</em>
                   {smsVerified && <button className="verify-edit" type="button" onClick={() => setEditingSms((editing) => !editing)}>{editingSms ? "Done" : "Edit"}</button>}
                 </header>
                 {!smsCollapsed && <div className="verify-item-body">
                   <div className="verify-tabs" role="tablist" aria-label="Verification method">
-                    <button className={`verify-tab ${otpChannel === "sms" ? "is-active" : ""}`} type="button" role="tab" aria-selected={otpChannel === "sms"} onClick={() => { if (otpChannel !== "sms") { setOtpChannel("sms"); setSmsVerified(false); setSmsCodeSent(false); setSmsOtp(""); } }}>📱 SMS</button>
-                    <button className={`verify-tab ${otpChannel === "email" ? "is-active" : ""}`} type="button" role="tab" aria-selected={otpChannel === "email"} onClick={() => { if (otpChannel !== "email") { setOtpChannel("email"); setSmsVerified(false); setSmsCodeSent(false); setSmsOtp(""); } }}>📧 Email</button>
+                    <button className={`verify-tab ${otpChannel === "sms" ? "is-active" : ""}`} type="button" role="tab" aria-selected={otpChannel === "sms"} onClick={() => { if (otpChannel !== "sms") { setOtpChannel("sms"); setSmsVerified(false); setSmsCodeSent(false); setSmsOtp(""); } }}>­ƒô▒ SMS</button>
+                    <button className={`verify-tab ${otpChannel === "email" ? "is-active" : ""}`} type="button" role="tab" aria-selected={otpChannel === "email"} onClick={() => { if (otpChannel !== "email") { setOtpChannel("email"); setSmsVerified(false); setSmsCodeSent(false); setSmsOtp(""); } }}>­ƒôº Email</button>
                   </div>
                   {otpChannel === "email" && <>
                     <label>
@@ -478,10 +480,10 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
                         ? "First enter a complete phone number (at least 10 digits) in step 1."
                         : "First enter your email address above."
                       : smsCodeSent
-                        ? `Code sent to ${otpChannel === "email" ? userEmail : userPhone}. Type it and press “Verify code”.`
+                        ? `Code sent to ${otpChannel === "email" ? userEmail : userPhone}. Type it and press ÔÇ£Verify codeÔÇØ.`
                         : otpChannel === "email"
-                          ? "Press “Send code by email” to receive it in your inbox."
-                          : "Press “Send SMS code” to receive it on your phone."}
+                          ? "Press ÔÇ£Send code by emailÔÇØ to receive it in your inbox."
+                          : "Press ÔÇ£Send SMS codeÔÇØ to receive it on your phone."}
                   </p>
                 </div>}
               </section>
@@ -490,15 +492,15 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
             {currentStep === 2 && (
               <section className={`verify-item is-${tokenVerified ? "complete" : "pending"}`}>
                 <header className="verify-item-heading">
-                  <span className="verify-item-number" aria-hidden="true">{tokenVerified ? "✓" : "1"}</span>
+                  <span className="verify-item-number" aria-hidden="true">{tokenVerified ? "Ô£ô" : "1"}</span>
                   <div className="verify-item-title"><b>DLP Token</b><small>{tokenVerified ? "Payment method protected" : "Tokenize your card: the merchant never sees the real number"}</small></div>
                   <em className={`verify-chip is-${tokenVerified ? "complete" : "pending"}`}>{tokenVerified ? "COMPLETED" : "PENDING"}</em>
                 </header>
                 <div className="verify-item-body">
                   <div className="sms-code-controls">
-                    <input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="•••• •••• •••• 4242" aria-label="Card number" />
+                    <input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="ÔÇóÔÇóÔÇóÔÇó ÔÇóÔÇóÔÇóÔÇó ÔÇóÔÇóÔÇóÔÇó 4242" aria-label="Card number" />
                     <button className="verify-action verify-action-confirm" type="button" disabled={tokenVerified} onClick={async () => { try { const token = await handleTokenizeCard(cardNumber); if (token) setTokenVerified(true); } catch (e) { console.warn(e); } }}>
-                      {tokenVerified ? "✓ Card protected" : "Tokenize card"}
+                      {tokenVerified ? "Ô£ô Card protected" : "Tokenize card"}
                     </button>
                   </div>
                 </div>
@@ -517,11 +519,11 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
           {currentStep === 2 && !tokenVerified && <p className="wizard-notice">Tokenize your secure payment method to continue.</p>}
 
           <div className="wizard-navigation">
-            {currentStep > 1 && <button className="wizard-back" type="button" onClick={() => setCurrentStep((currentStep - 1) as 1 | 2 | 3 | 4)}>← Back</button>}
-            {currentStep === 1 && <button className="wizard-next" type="button" disabled={!stepOneReady} onClick={() => setCurrentStep(2)}>Next →</button>}
-            {currentStep === 2 && <button className="wizard-next" type="button" disabled={!tokenVerified} onClick={() => setCurrentStep(3)}>Next →</button>}
-            {currentStep === 3 && <button className="wizard-next" type="button" onClick={() => setCurrentStep(4)}>Next →</button>}
-            {currentStep === 4 && <button className="authorize-button" disabled={creating || !(passkeyVerified && smsVerified && tokenVerified)} type="submit">{creating ? "CREATING YOUR PERMISSION…" : !passkeyVerified ? "⚠ BIOMETRICS MISSING" : !smsVerified ? "⚠ OTP CODE MISSING" : !tokenVerified ? "⚠ BANK TOKEN MISSING" : "AUTHORIZE SATURDAY"}</button>}
+            {currentStep > 1 && <button className="wizard-back" type="button" onClick={() => setCurrentStep((currentStep - 1) as 1 | 2 | 3 | 4)}>ÔåÉ Back</button>}
+            {currentStep === 1 && <button className="wizard-next" type="button" disabled={!stepOneReady} onClick={() => setCurrentStep(2)}>Next ÔåÆ</button>}
+            {currentStep === 2 && <button className="wizard-next" type="button" disabled={!tokenVerified} onClick={() => setCurrentStep(3)}>Next ÔåÆ</button>}
+            {currentStep === 3 && <button className="wizard-next" type="button" onClick={() => setCurrentStep(4)}>Next ÔåÆ</button>}
+            {currentStep === 4 && <button className="authorize-button" disabled={creating || !(passkeyVerified && smsVerified && tokenVerified)} type="submit">{creating ? "CREATING YOUR PERMISSIONÔÇª" : !passkeyVerified ? "ÔÜá BIOMETRICS MISSING" : !smsVerified ? "ÔÜá OTP CODE MISSING" : !tokenVerified ? "ÔÜá BANK TOKEN MISSING" : "AUTHORIZE SATURDAY"}</button>}
           </div>
         </form>
       </section>

@@ -146,8 +146,9 @@ def normalizar_telefono(phone_number: str) -> str:
 
 @app.post("/auth/sms/start")
 def auth_sms_start(payload: SmsStartRequest):
+    import secrets
     telefono = normalizar_telefono(payload.phone_number)
-    code = "849201"
+    code = str(secrets.randbelow(900000) + 100000)
     _otp_store[telefono] = code
     _otp_store[payload.phone_number.strip()] = code
     
@@ -166,7 +167,7 @@ def auth_sms_start(payload: SmsStartRequest):
         "ok": True,
         "status": status_str,
         "phone_hint": f"***{telefono[-4:]}" if len(telefono) >= 4 else telefono,
-        "code_demo": code,
+        "code_demo": code if not (twilio_client and TWILIO_VERIFY_SERVICE_SID) else "******",
         "message": f"Código SMS enviado a {telefono}"
     }
 
@@ -176,7 +177,7 @@ def auth_sms_check(payload: SmsCheckRequest):
     telefono = normalizar_telefono(payload.phone_number)
     code_in = payload.code.strip()
     
-    # Si Twilio Verify está configurado, intentar validación nativa
+    # Si Twilio Verify está configurado, validación real estricta con Twilio
     if twilio_client and TWILIO_VERIFY_SERVICE_SID:
         try:
             check = twilio_client.verify.v2.services(TWILIO_VERIFY_SERVICE_SID).verification_checks.create(
@@ -190,12 +191,16 @@ def auth_sms_check(payload: SmsCheckRequest):
                     "phone": telefono,
                     "message": "Número verificado correctamente con Twilio Verify."
                 }
+            raise HTTPException(status_code=401, detail="Código SMS incorrecto o expirado.")
+        except HTTPException:
+            raise
         except Exception as err:
             print("Twilio check notice:", err)
+            raise HTTPException(status_code=401, detail=f"Error validando con Twilio: {err}")
 
-    # Validación con store en memoria y fallback
-    expected = _otp_store.get(telefono) or _otp_store.get(payload.phone_number.strip()) or "849201"
-    if code_in == expected or (len(code_in) == 6 and code_in.isdigit()):
+    # Validación estricta con el código generado aleatoriamente
+    expected = _otp_store.get(telefono) or _otp_store.get(payload.phone_number.strip())
+    if expected and code_in == expected:
         return {
             "ok": True,
             "verified": True,
@@ -207,8 +212,9 @@ def auth_sms_check(payload: SmsCheckRequest):
 
 @app.post("/api/otp/send")
 def api_otp_send(req: OtpSendReq):
+    import secrets
     telefono = normalizar_telefono(req.phone)
-    code = "849201"
+    code = str(secrets.randbelow(900000) + 100000)
     _otp_store[telefono] = code
     _otp_store[req.phone.strip()] = code
 
@@ -224,7 +230,7 @@ def api_otp_send(req: OtpSendReq):
 
     return {
         "success": True,
-        "code": code,
+        "code": code if not (twilio_client and TWILIO_VERIFY_SERVICE_SID) else "******",
         "message": f"Código SMS OTP enviado a {telefono}",
         "phone": telefono,
         "requestId": f"req_{int(time.time())}"
@@ -235,9 +241,9 @@ def api_otp_send(req: OtpSendReq):
 def api_otp_verify(req: OtpVerifyReq):
     telefono = normalizar_telefono(req.phone)
     code_in = req.code.strip()
-    expected = _otp_store.get(telefono) or _otp_store.get(req.phone.strip()) or "849201"
+    expected = _otp_store.get(telefono) or _otp_store.get(req.phone.strip())
     
-    if code_in == expected or (len(code_in) == 6 and code_in.isdigit()):
+    if expected and code_in == expected:
         return {
             "success": True,
             "verified": True,
@@ -266,8 +272,9 @@ _email_otp_store: Dict[str, str] = {}
 
 @app.post("/auth/email/start")
 def auth_email_start(payload: EmailStartRequest):
+    import secrets
     email_addr = payload.email.strip().lower()
-    code = "849201"
+    code = str(secrets.randbelow(900000) + 100000)
     _email_otp_store[email_addr] = code
 
     sent_via = "memory"
@@ -277,12 +284,12 @@ def auth_email_start(payload: EmailStartRequest):
             from email.mime.text import MIMEText
 
             msg = MIMEText(
-                f"Tu código de verificación Aegis es: {code}\n\nNo compartas este código con nadie.",
+                f"🛡️ Zero-Trust Verification Code (Aegis):\n\nYour 6-digit verification code is: {code}\n\nThis code expires in 10 minutes. Do not share it with anyone.",
                 "plain",
                 "utf-8",
             )
-            msg["Subject"] = f"Aegis OTP: {code}"
-            msg["From"] = SMTP_USER
+            msg["Subject"] = f"Aegis Security OTP: {code}"
+            msg["From"] = f"Saturday Agent <{SMTP_USER}>"
             msg["To"] = email_addr
 
             with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
@@ -296,9 +303,8 @@ def auth_email_start(payload: EmailStartRequest):
         "ok": True,
         "status": "pending",
         "email_hint": f"***{email_addr.split('@')[0][-3:]}@{email_addr.split('@')[1]}" if "@" in email_addr else email_addr,
-        "code_demo": code,
         "sent_via": sent_via,
-        "message": f"Código OTP enviado a {email_addr}",
+        "message": f"OTP code sent to {email_addr}",
     }
 
 
@@ -307,15 +313,15 @@ def auth_email_check(payload: EmailCheckRequest):
     email_addr = payload.email.strip().lower()
     code_in = payload.code.strip()
 
-    expected = _email_otp_store.get(email_addr, "849201")
-    if code_in == expected or (len(code_in) == 6 and code_in.isdigit()):
+    expected = _email_otp_store.get(email_addr)
+    if expected and code_in == expected:
         return {
             "ok": True,
             "verified": True,
             "email": email_addr,
-            "message": "Email verificado correctamente.",
+            "message": "Email verified successfully.",
         }
-    raise HTTPException(status_code=401, detail="Código email OTP incorrecto o expirado.")
+    raise HTTPException(status_code=401, detail="Incorrect or expired Email OTP code.")
 
 
 # Mandate Endpoints
