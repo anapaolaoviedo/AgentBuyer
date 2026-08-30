@@ -5,6 +5,10 @@ fastapi>=0.141        # API (api/main.py, api/verify.py, ...)
 uvicorn[standard]>=0.34   # servidor:  uvicorn api.main:app --reload
 pydantic>=2           # modelos (viene con fastapi, se fija por claridad)
 
+# Búsqueda real de ofertas (core/merchant_search.py)
+openai>=1.60
+python-dotenv>=1
+
 # Tests
 pytest>=9
 httpx>=0.28           # requerido por fastapi.testclient en tests/ de integración

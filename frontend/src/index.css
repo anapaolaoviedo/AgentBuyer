@@ -82,3 +82,25 @@ button { font: inherit; }
 .result-links { display: grid; gap: .3rem; margin-top: .9rem; padding-top: .75rem; border-top: 1px solid #232D45; }.result-links button { width: fit-content; padding: 0; border: 0; background: transparent; color: #8A94AD; font-family: Inter, sans-serif; font-size: .7rem; text-align: left; cursor: pointer; transition: color .2s; }.result-links button:hover { color: #4D7CFF; }.result-links button:first-child { color: #3DDC97; }
 .verdict-summary { display: flex; flex-wrap: wrap; gap: .45rem; margin: 0 0 1rem; }.verdict-summary span { display: inline-flex; padding: .35rem .55rem; border: 1px solid #232D45; border-radius: .45rem; font-family: "Space Grotesk", sans-serif; font-size: .62rem; font-weight: 700; letter-spacing: .04em; }.summary-approve { background: rgba(61,220,151,.08); color: #3DDC97; }.summary-escalate { background: rgba(255,184,77,.08); color: #FFB84D; }.summary-reject { background: rgba(255,92,92,.1); color: #FF5C5C; }
 .audit-row-approve td { background: rgba(61,220,151,.025); }.audit-row-escalate td { background: rgba(255,184,77,.03); }.audit-row-reject td { background: rgba(255,92,92,.09); }.audit-row-reject td:first-child { box-shadow: inset 3px 0 0 #FF5C5C; color: #E8ECF5; }.audit-row-reject .event-type { color: #FF5C5C; }
+
+/* Búsqueda web real (Despegar/Kayak/Expedia) + revisión humana de escalaciones. */
+.web-search-form { display: grid; gap: .45rem; margin-top: .85rem; padding-bottom: .85rem; border-bottom: 1px solid #232D45; }
+.web-search-pair { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; }
+.web-search-form input { min-height: 2.35rem; padding: 0 .6rem; border: 1px solid #232D45; border-radius: .55rem; outline: none; background: #0A0E1A; color: #E8ECF5; font-family: Inter, sans-serif; font-size: .78rem; font-weight: 500; transition: border-color .2s, box-shadow .2s; }
+.web-search-form input:focus { border-color: #4D7CFF; box-shadow: 0 0 0 3px rgba(77,124,255,.14); }
+.web-search-form input::-webkit-calendar-picker-indicator { filter: invert(.65); }
+.web-search-button { min-height: 2.45rem; border: 1px solid #4D7CFF; border-radius: .6rem; background: rgba(77,124,255,.12); color: #4D7CFF; font-family: "Space Grotesk", sans-serif; font-size: .62rem; font-weight: 700; letter-spacing: .08em; cursor: pointer; transition: background .2s, transform .2s; }
+.web-search-button:hover { transform: translateY(-1px); background: rgba(77,124,255,.2); }
+.web-search-button:disabled { cursor: not-allowed; opacity: .55; transform: none; }
+.catalog-reset { width: fit-content; padding: 0; border: 0; background: transparent; color: #8A94AD; font-family: Inter, sans-serif; font-size: .68rem; text-align: left; cursor: pointer; transition: color .2s; }
+.catalog-reset:hover { color: #4D7CFF; }
+.search-note { margin: .55rem 0 0; color: #FFB84D; font-size: .7rem; line-height: 1.4; }
+.search-hint { margin: .55rem 0 0; color: #8A94AD; font-size: .66rem; line-height: 1.45; }
+.human-review { margin-top: .9rem; padding-top: .8rem; border-top: 1px solid #232D45; }
+.human-review p { margin: 0 0 .55rem; color: #FFB84D; font-size: .73rem; line-height: 1.4; }
+.human-review-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.human-approve, .human-decline { min-height: 2.55rem; border-radius: .6rem; font-family: "Space Grotesk", sans-serif; font-size: .63rem; font-weight: 700; letter-spacing: .08em; cursor: pointer; transition: transform .2s, opacity .2s; }
+.human-approve:hover, .human-decline:hover { transform: translateY(-1px); }
+.human-approve:disabled, .human-decline:disabled { cursor: not-allowed; opacity: .55; transform: none; }
+.human-approve { border: 1px solid #3DDC97; background: rgba(61,220,151,.12); color: #3DDC97; }
+.human-decline { border: 1px solid #FF5C5C; background: rgba(255,92,92,.1); color: #FF5C5C; }

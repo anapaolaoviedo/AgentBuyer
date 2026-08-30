@@ -6,6 +6,38 @@ from uuid import uuid4
 from audit.log import append_entry
 from core.mandate_store import get_mandate
 from core.merchant import get_flights
+from core.merchant_search import _merchant_slug, search_merchant_offers
+
+
+def _discover_flights(search_fields: dict | None) -> tuple[list[dict], str]:
+    """Descubre vuelos: búsqueda web real si hay campos; mock como respaldo.
+
+    El mock (catálogo VuelaYa) queda como fallback deliberado: si la búsqueda
+    real falla o no hay red (wifi de conferencia), la demo sigue funcionando.
+    """
+    if isinstance(search_fields, dict) and search_fields:
+        offers = search_merchant_offers("flights", search_fields)
+        if offers:
+            route = f"{search_fields.get('origin', '?')}->{search_fields.get('destination', '?')}"
+            flights = [
+                {
+                    "id": f"web_{index}",
+                    "route": route,
+                    "price": offer["price"],
+                    "category": "travel.flights",
+                    "merchant_id": _merchant_slug(offer["merchant"]),
+                    "merchant": offer["merchant"],
+                    "details": offer["details"],
+                    "url": offer["url"],
+                    "source": "web",
+                }
+                for index, offer in enumerate(offers)
+            ]
+            return flights, "web"
+    mock_flights = [
+        flight | {"source": "mock", "merchant": "VuelaYa"} for flight in get_flights()
+    ]
+    return mock_flights, "mock"
 
 
 def _price_limit(mandate: dict) -> int | float | None:
@@ -21,10 +53,14 @@ def _price_limit(mandate: dict) -> int | float | None:
     return None
 
 
-def run_agent(mandate_id: str) -> dict:
-    """Descubre, decide, intenta y registra el resultado de una compra."""
-    # Descubrimiento: la misma función respalda GET /merchant/flights.
-    flights_seen = get_flights()
+def run_agent(mandate_id: str, search_fields: dict | None = None) -> dict:
+    """Descubre, decide, intenta y registra el resultado de una compra.
+
+    Con search_fields ({origin, destination, departure_date, ...}) descubre
+    ofertas REALES vía web search; sin ellos (o si la búsqueda falla) usa el
+    catálogo mock de VuelaYa, como siempre.
+    """
+    flights_seen, discovery_source = _discover_flights(search_fields)
     record = get_mandate(mandate_id)
     mandate = record["mandate"] if record is not None else {}
     limit = _price_limit(mandate)
@@ -44,7 +80,12 @@ def run_agent(mandate_id: str) -> dict:
             "amount": selected_flight["price"],
             "currency": "USD",
             "description": f"Vuelo {selected_flight['route']}",
-            "metadata": {"flight_id": selected_flight["id"], "price": selected_flight["price"]},
+            "metadata": {
+                "flight_id": selected_flight["id"],
+                "price": selected_flight["price"],
+                "source": selected_flight["source"],
+                **({"url": selected_flight["url"]} if selected_flight.get("url") else {}),
+            },
         },
     }
 
@@ -55,8 +96,9 @@ def run_agent(mandate_id: str) -> dict:
     verdict = verification["verdict"]
     completed = verdict == "APPROVE"
 
+    source_label = "en la web (búsqueda real)" if discovery_source == "web" else "en el catálogo demo"
     story = (
-        f"Encontró {len(flights_seen)} vuelos. "
+        f"Encontró {len(flights_seen)} vuelos {source_label}. "
         + (f"Aplicó el límite price_below de {limit} USD y " if limit is not None else "No encontró un límite price_below utilizable y ")
         + f"eligió {selected_flight['id']} ({selected_flight['route']}) por {selected_flight['price']} USD. "
         + ("La compra fue completada tras recibir APPROVE." if completed else f"La compra no procedió: verify devolvió {verdict}. {verification['human_readable']}")
@@ -84,6 +126,7 @@ def run_agent(mandate_id: str) -> dict:
     return {
         "mandate_id": mandate_id,
         "attempt_id": attempt_id,
+        "discovery_source": discovery_source,
         "flights_seen": flights_seen,
         "selected_flight": selected_flight,
         "selection_reason": "Vuelo más barato dentro de price_below." if eligible else "No hubo vuelo dentro de price_below; se intentó el más barato disponible.",
