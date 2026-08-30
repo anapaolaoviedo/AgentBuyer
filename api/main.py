@@ -284,7 +284,7 @@ def auth_email_start(payload: EmailStartRequest):
             from email.mime.text import MIMEText
 
             msg = MIMEText(
-                f"🛡️ Código de Verificación Zero-Trust (Aegis):\n\nTu código de verificación de 6 dígitos es: {code}\n\nEste código expira en 10 minutos. No lo compartas con nadie.",
+                f"🛡️ Zero-Trust Verification Code (Aegis):\n\nYour 6-digit verification code is: {code}\n\nThis code expires in 10 minutes. Do not share it with anyone.",
                 "plain",
                 "utf-8",
             )
@@ -304,7 +304,7 @@ def auth_email_start(payload: EmailStartRequest):
         "status": "pending",
         "email_hint": f"***{email_addr.split('@')[0][-3:]}@{email_addr.split('@')[1]}" if "@" in email_addr else email_addr,
         "sent_via": sent_via,
-        "message": f"Código OTP enviado a {email_addr}",
+        "message": f"OTP code sent to {email_addr}",
     }
 
 
@@ -319,9 +319,9 @@ def auth_email_check(payload: EmailCheckRequest):
             "ok": True,
             "verified": True,
             "email": email_addr,
-            "message": "Email verificado correctamente.",
+            "message": "Email verified successfully.",
         }
-    raise HTTPException(status_code=401, detail="Código Email OTP incorrecto o expirado.")
+    raise HTTPException(status_code=401, detail="Incorrect or expired Email OTP code.")
 
 
 # Mandate Endpoints
