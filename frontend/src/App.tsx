@@ -40,6 +40,8 @@ type Flight = { id: string; route: string; price: number; category: string; merc
 type Check = { rule: string; pass: boolean; detail: string };
 type Verification = { verdict: "APPROVE" | "ESCALATE" | "REJECT"; checks: Check[]; human_readable?: string };
 type AgentRun = {
+  attempt_id?: string;
+  discovery_source?: "web" | "mock";
   verification?: Verification;
   verdict?: Verification["verdict"];
   checks?: Check[];
@@ -59,7 +61,16 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
     headers: { "Content-Type": "application/json", ...options?.headers },
   });
-  if (!response.ok) throw new Error(`El sistema respondió ${response.status}.`);
+  if (!response.ok) {
+    // El backend explica sus 404/409/422 en `detail`; se muestra tal cual
+    // (clave para los errores de la revisión humana: mandato revocado, etc.).
+    let message = `El sistema respondió ${response.status}.`;
+    try {
+      const body = (await response.json()) as { detail?: string };
+      if (typeof body.detail === "string" && body.detail) message = body.detail;
+    } catch { /* cuerpo no-JSON: se conserva el mensaje genérico */ }
+    throw new Error(message);
+  }
   return response.json() as Promise<T>;
 }
 
@@ -100,13 +111,17 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
   const [pendingVerification, setPendingVerification] = useState<Verification | null>(null);
   const [activity, setActivity] = useState<AgentRun | null>(null);
   const [saturdayState, setSaturdayState] = useState<SaturdayState>("idle");
-  const [busy, setBusy] = useState<"loading" | "running" | "revoking" | "resetting" | null>("loading");
+  const [busy, setBusy] = useState<"loading" | "running" | "revoking" | "resetting" | "reviewing" | null>("loading");
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   const [phase, setPhase] = useState<DecisionPhase>("idle");
   const [scannedFlight, setScannedFlight] = useState<number | null>(null);
   const [chosenFlightId, setChosenFlightId] = useState<string | null>(null);
   const [revealedChecks, setRevealedChecks] = useState(0);
+  // Intento escalado pendiente de la decisión humana (approve/decline).
+  const [escalatedAttemptId, setEscalatedAttemptId] = useState<string | null>(null);
+  // Ruta pedida cuando la búsqueda web no devolvió nada y se usó el catálogo demo.
+  const [searchFellBack, setSearchFellBack] = useState<string | null>(null);
 
   const constraints = mandate?.mandate.constraints ?? {};
   const priceLimit = useMemo(
@@ -159,6 +174,8 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
     setActivity(null);
     setChosenFlightId(null);
     setRevealedChecks(0);
+    setEscalatedAttemptId(null);
+    setSearchFellBack(null);
     setSaturdayState("thinking");
 
     try {
@@ -189,6 +206,14 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
       };
       // La respuesta normalizada del backend reemplaza el catálogo inicial.
       if (run.flights_seen?.length) setFlights(run.flights_seen);
+      // Si el mandato pedía una ruta real pero la búsqueda web no devolvió ofertas,
+      // el backend cae al catálogo demo (BUE→COR). NUNCA silencioso: se avisa.
+      const wantedRoute = mandate?.mandate.search_fields;
+      if (wantedRoute?.origin && wantedRoute?.destination && run.discovery_source === "mock") {
+        setSearchFellBack(`${wantedRoute.origin} → ${wantedRoute.destination}`);
+      } else {
+        setSearchFellBack(null);
+      }
       setPhase("choosing");
       setChosenFlightId(run.selected_flight?.id ?? null);
       await wait(700);
@@ -202,6 +227,8 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
       setActivity(run);
       setVerification(result);
       setPendingVerification(null);
+      // Una escalación queda pendiente de la decisión humana (approve/decline).
+      setEscalatedAttemptId(result.verdict === "ESCALATE" ? run.attempt_id ?? null : null);
       setSaturdayState(verdictState(result.verdict));
       setToast({ id: Date.now(), ...toastFor(run, result) });
       const mandateData = await request<MandateRecord>(`/mandates/${mandateId}`);
@@ -229,10 +256,39 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
       setActivity(null);
       setChosenFlightId(null);
       setRevealedChecks(0);
+      setEscalatedAttemptId(null);
       setPhase("idle");
       setSaturdayState("reject");
       setToast({ id: Date.now(), tone: "reject", message: "🔒 Mandato revocado — Saturday ya no puede comprar" });
     } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "No hay conexión con el sistema.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function reviewEscalation(decision: "approve" | "decline") {
+    if (!escalatedAttemptId) return;
+    setBusy("reviewing");
+    setError(null);
+    try {
+      const result = await request<Verification>(`/mandates/${mandateId}/approve_escalation`, {
+        method: "POST",
+        body: JSON.stringify({ purchase_attempt_id: escalatedAttemptId, decision }),
+      });
+      // La respuesta tiene la misma forma que /verify: se renderiza como cualquier veredicto.
+      setVerification(result);
+      setSaturdayState(verdictState(result.verdict));
+      setEscalatedAttemptId(null);
+      setToast({
+        id: Date.now(),
+        tone: decision === "approve" ? "approve" : "reject",
+        message: decision === "approve" ? "✅ Aprobaste la compra — registrada" : "🚫 Rechazaste la compra",
+      });
+      const mandateData = await request<MandateRecord>(`/mandates/${mandateId}`);
+      setMandate(mandateData);
+    } catch (caught) {
+      // El mandato pudo revocarse entre la escalación y la decisión: el backend lo explica.
       setError(caught instanceof Error ? caught.message : "No hay conexión con el sistema.");
     } finally {
       setBusy(null);
@@ -250,6 +306,7 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
       setActivity(null);
       setChosenFlightId(null);
       setRevealedChecks(0);
+      setEscalatedAttemptId(null);
       setPhase("idle");
       setSaturdayState("idle");
       setToast(null);
@@ -308,7 +365,12 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
 
         <section className="control-grid">
           <aside className="side-panel flights-panel">
-            <div className="panel-title"><span>VUELOS DESCUBIERTOS</span><small>{flights.length} EN CATÁLOGO</small></div>
+            <div className="panel-title"><span>VUELOS DESCUBIERTOS</span><small>{flights.length} {searchFellBack ? "CATÁLOGO DEMO" : "EN CATÁLOGO"}</small></div>
+            {searchFellBack && (
+              <p className="search-fallback-note" role="status">
+                ⚠ La búsqueda web no encontró ofertas para <b>{searchFellBack}</b>. Saturday usó el catálogo demo (BUE→COR) — estos NO son la ruta que pediste.
+              </p>
+            )}
             <div className="flight-list">
               {flights.map((flight, index) => {
                 const isEvaluating = phase === "evaluating" || phase === "choosing" || phase === "verifying";
@@ -363,6 +425,19 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
                   ))}
                   </AnimatePresence>
                 </div>
+                {verification?.verdict === "ESCALATE" && escalatedAttemptId && phase === "idle" && (
+                  <div className="human-review">
+                    <p>⚠ Escalada — nunca se aprueba en silencio. Tú decides:</p>
+                    <div className="human-review-actions">
+                      <button className="human-approve" disabled={busy !== null} onClick={() => void reviewEscalation("approve")} type="button">
+                        {busy === "reviewing" ? "REGISTRANDO…" : "✓ APROBAR"}
+                      </button>
+                      <button className="human-decline" disabled={busy !== null} onClick={() => void reviewEscalation("decline")} type="button">
+                        ✕ RECHAZAR
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {verification && phase === "idle" && <div className="result-links">
                   {verification.verdict === "APPROVE" && <button onClick={() => onNavigate("account")} type="button">✓ Compra registrada — verla en Mis compras</button>}
                   <button onClick={() => onNavigate("audit")} type="button">Este intento quedó en el registro — ver en Auditoría →</button>

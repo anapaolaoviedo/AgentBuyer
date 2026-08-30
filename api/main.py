@@ -537,12 +537,29 @@ def api_webhook_travel_provider(payload: dict):
     pnr = payload.get("pnr", "PNR-VYA-849201")
     flight_id = payload.get("flight_id", "FLIGHT_COR_130")
     status_str = payload.get("status", "TICKET_ISSUED")
+    user_email = payload.get("email") or os.getenv("SMTP_USER", "")
 
     append_entry({
         "type": "settlement_completed",
         "mandate_id": payload.get("mandate_id", "mnd_live"),
         "summary": f"Emisión de boleto confirmada por aerolínea: PNR {pnr} ({status_str}).",
     })
+
+    try:
+        from core.notifications import enviar_ticket_confirmacion
+        enviar_ticket_confirmacion(
+            correo_destino=user_email,
+            detalles_reserva={
+                "destino": payload.get("destination", "Córdoba (COR)"),
+                "proveedor": payload.get("merchant", "VuelaYa Travel"),
+                "pnr": pnr,
+                "precio_total": payload.get("amount", 130),
+                "moneda": "USD",
+            }
+        )
+    except Exception as notify_err:
+        print("Aviso al enviar ticket desde webhook:", notify_err)
+
     return {"received": True, "pnr": pnr, "status": status_str}
 
 
@@ -563,20 +580,8 @@ def api_verify_audit_integrity():
 
 
 
-# Dispute Resolution Endpoints
-@app.post("/disputes/file", response_model=DisputeClaim)
-def api_file_dispute(req: FileDisputeRequest):
-    return dispute_arbiter.file_dispute(
-        attempt_id=req.attempt_id,
-        mandate_id=req.mandate_id,
-        claimant_id=req.claimant_id,
-        reason=req.reason,
-    )
-
-
-@app.get("/disputes", response_model=List[DisputeClaim])
-def api_list_disputes():
-    return dispute_arbiter.list_disputes()
+# Disputas: /disputes/file y /disputes viven en api/disputes.py (resolver
+# nativo del modelo API/React). core/dispute.py sigue sirviendo al flujo adversarial.
 
 
 # Adversarial Suite Runner
@@ -592,11 +597,13 @@ def api_run_adversarial():
 # Include modular routers
 from api.agent import router as agent_router
 from api.audit import router as audit_router
+from api.disputes import router as disputes_router
 from api.escalations import router as escalations_router
 from api.merchant import router as merchant_router
 
 app.include_router(agent_router)
 app.include_router(audit_router)
+app.include_router(disputes_router)
 app.include_router(escalations_router)
 app.include_router(merchant_router)
 

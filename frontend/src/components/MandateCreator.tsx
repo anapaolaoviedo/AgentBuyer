@@ -1,5 +1,5 @@
-import { FormEvent, useMemo, useRef, useState } from "react";
-import Saturday, { type SaturdayExpression } from "./Saturday";
+import { FormEvent, useMemo, useState, useEffect } from "react";
+import Saturday from "./Saturday";
 import { useLivenessVerification } from "../hooks/useLivenessVerification";
 import { useZeroTrustSecurity } from "../hooks/useZeroTrustSecurity";
 
@@ -32,6 +32,14 @@ const merchants = [{ value: "mch_vuelaya", label: "VuelaYa" }];
 function endOfMonth() {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+}
+
+// Fecha cercana (~2 semanas) para que la búsqueda web real devuelva resultados
+// de forma confiable — las fechas muy lejanas suelen no tener tarifas publicadas.
+function nearTermDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + 14);
+  return d.toISOString().slice(0, 10);
 }
 
 function safeId(value: string, prefix: string) {
@@ -125,17 +133,18 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
   const [priceBelow, setPriceBelow] = useState("");
   const [validUntil, setValidUntil] = useState(endOfMonth());
   // Estos datos viajan con el permiso para que Saturday pueda buscar la ruta real.
-  const [flightOrigin, setFlightOrigin] = useState("");
-  const [flightDestination, setFlightDestination] = useState("");
-  const [departureDate, setDepartureDate] = useState("");
+  // Ruta por defecto BUE→COR con fecha cercana: combinación confirmada que
+  // la búsqueda web real devuelve de forma confiable para la demo.
+  const [flightOrigin, setFlightOrigin] = useState("BUE");
+  const [flightDestination, setFlightDestination] = useState("COR");
+  const [departureDate, setDepartureDate] = useState(nearTermDate());
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
-  
+
   // 🛡️ Identidad y Datos Bancarios DLP
   const [userIdDoc, setUserIdDoc] = useState("");
   const [userPhone, setUserPhone] = useState("");
   const [smsOtp, setSmsOtp] = useState("");
   const [cardNumber, setCardNumber] = useState("");
-
 
   // Modal y Hooks Biométicos
   const [showBioModal, setShowBioModal] = useState(false);
@@ -152,7 +161,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
   const expressionTimer = useRef<number | null>(null);
 
   const { videoRef, livenessState, startCamera, stopCamera, verifyFacePresence, sendSmsCode, verifySmsCode } = useLivenessVerification();
-  const { handlePasskeyChallenge, handleTokenizeCard, sendOtp, verifyOtp, isSubmitEnabled, isStripeTokenized, isPossessionVerified, errorMessage: securityError, isLoading: securityLoading } = useZeroTrustSecurity();
+  const { handlePasskeyChallenge, handleTokenizeCard, sendOtp, verifyOtp, isSubmitEnabled, isStripeTokenized, isPossessionVerified, paymentMethodId, errorMessage: securityError, isLoading: securityLoading } = useZeroTrustSecurity();
 
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -187,7 +196,6 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
     setBioMode("camera");
     try {
       await startCamera();
-      // Iniciar verificación tras 1.5s
       setTimeout(async () => {
         try {
           await verifyFacePresence();
@@ -200,7 +208,6 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
         }
       }, 1500);
     } catch {
-      // Fallback a passkey nativo WebAuthn
       try {
         await handlePasskeyChallenge();
         setPasskeyVerified(true);
@@ -235,8 +242,8 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
     const mandateId = safeId(humanName, "mnd");
     const payload = {
       mandate_id: mandateId,
-      human: { 
-        id: safeId(humanName, "hum"), 
+      human: {
+        id: safeId(humanName, "hum"),
         display_name: humanName.trim(),
         id_document: userIdDoc,
         phone: userPhone,
@@ -264,24 +271,15 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
         sms_code: smsOtp,
       },
       payment_token: {
-        token_id: `vtok_${Math.random().toString(36).slice(2, 10)}`,
+        token_id: paymentMethodId || `vtok_${Math.random().toString(36).slice(2, 10)}`,
         token_type: "SCOPED_VIRTUAL_TOKEN",
-        masked_card: cardNumber || "•••• 4242",
+        masked_card: cardNumber ? (cardNumber.startsWith("••••") ? cardNumber : `•••• ${cardNumber.replace(/\D/g, "").slice(-4) || "4242"}`) : "•••• 4242",
         bank_issuer: "Stripe Elements / Galicia AI Payments",
       },
       ...(validUntil ? { valid_until: validUntil } : {}),
       signature: "ed25519_passkey_signed_jwt_token",
     };
 
-    if (!tokenVerified) {
-      try {
-        const token = await handleTokenizeCard();
-        if (token) setTokenVerified(true);
-      } catch (e) {
-        setError("No se pudo tokenizar el método de pago.");
-        return;
-      }
-    }
     setCreating(true);
     try {
       const response = await fetch(`${API_BASE}/mandates`, {
@@ -301,7 +299,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
   return (
     <main className="authorization-shell">
       <div className="starfield" aria-hidden="true" />
-      
+
       {/* Modal Biométrico */}
       {showBioModal && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(10, 14, 26, 0.94)", backdropFilter: "blur(16px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
@@ -340,23 +338,23 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
             <span className={currentStep === 3 ? "is-current" : currentStep > 3 ? "is-complete" : ""}>3. Define los límites</span>
             <span className={currentStep === 4 ? "is-current" : ""}>4. Confirma</span>
           </div>
-          <div className="wizard-step" style={{ display: currentStep === 3 ? "grid" : "none" }}>
-          <h3>Define los límites</h3>
-          <label>¿Quién autoriza?<input value={humanName} onChange={(event) => setHumanName(event.target.value)} placeholder="Tu nombre" required /></label>
-          <label>¿Cuánto puede gastar como máximo en cada compra?<div className="money-field"><span>USD $</span><input value={maxAmount} onChange={(event) => setMaxAmount(event.target.value)} inputMode="decimal" placeholder="150" required /></div></label>
-          <div className="form-pair">
-            <label>¿En qué puede gastar?<select value={category} onChange={(event) => setCategory(event.target.value)} required><option value="" disabled>Elige una categoría</option>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-            <label>¿En qué comercios?<select value={merchant} onChange={(event) => setMerchant(event.target.value)} required><option value="" disabled>Elige un comercio</option>{merchants.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-          </div>
-          <div className="form-pair">
-            <label>¿Cuántas compras puede hacer como máximo?<input value={maxUses} onChange={(event) => setMaxUses(event.target.value)} inputMode="numeric" placeholder="3" required /></label>
-            <label>¿Hasta cuándo es válido este permiso?<input type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></label>
-          </div>
-          <label>¿Alguna condición de precio?<div className="price-condition"><span>Solo si el precio baja de USD $</span><input value={priceBelow} onChange={(event) => setPriceBelow(event.target.value)} inputMode="decimal" placeholder="150" required /></div></label>
+
+          <div className="wizard-step" style={{ display: currentStep === 2 ? "grid" : "none" }}>
+            <h3>Define los límites</h3>
+            <label>¿Quién autoriza?<input value={humanName} onChange={(event) => setHumanName(event.target.value)} placeholder="Tu nombre" required /></label>
+            <label>¿Cuánto puede gastar como máximo en cada compra?<div className="money-field"><span>USD $</span><input value={maxAmount} onChange={(event) => setMaxAmount(event.target.value)} inputMode="decimal" placeholder="150" required /></div></label>
+            <div className="form-pair">
+              <label>¿En qué puede gastar?<select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+              <label>¿En qué comercios?<select value={merchant} onChange={(event) => setMerchant(event.target.value)}>{merchants.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+            </div>
+            <div className="form-pair">
+              <label>¿Cuántas compras puede hacer como máximo?<input value={maxUses} onChange={(event) => setMaxUses(event.target.value)} inputMode="numeric" placeholder="3" required /></label>
+              <label>¿Hasta cuándo es válido este permiso?<input type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></label>
+            </div>
+            <label>¿Alguna condición de precio?<div className="price-condition"><span>Solo si el precio baja de USD $</span><input value={priceBelow} onChange={(event) => setPriceBelow(event.target.value)} inputMode="decimal" placeholder="150" required /></div></label>
           </div>
 
-          {/* 🛡️ SECCIÓN AÑADIDA: Autenticación Fuerte (Passkey, ID, SMS) & Datos Bancarios DLP */}
-          {category === "travel.flights" && currentStep === 3 && <div className="wizard-step flight-search-step">
+          {category === "travel.flights" && currentStep === 2 && <div className="wizard-step flight-search-step">
             <div className="form-pair">
               <label>Origen<input value={flightOrigin} onChange={(event) => setFlightOrigin(event.target.value)} placeholder="BUE o Buenos Aires" required /></label>
               <label>Destino<input value={flightDestination} onChange={(event) => setFlightDestination(event.target.value)} placeholder="COR o Ciudad de México" required /></label>
@@ -366,12 +364,11 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
 
           <div className={`wizard-step wizard-security-step ${currentStep === 1 || currentStep === 2 ? "is-visible" : ""}`} style={{ background: "rgba(30, 41, 59, 0.6)", padding: "14px", borderRadius: "10px", border: "1px solid rgba(77, 124, 255, 0.35)", marginTop: "4px" }}>
             <h3>{currentStep === 1 ? "Verifica que eres tú" : "Método de pago seguro"}</h3>
-            <p className="security-intro">{currentStep === 1 ? "Completa estas tres verificaciones para proteger tu permiso." : "Tokeniza tu tarjeta: Saturday nunca verá el número completo."}</p>
-            {currentStep === 1 && <div className="security-progress"><span>PROGRESO DE SEGURIDAD</span><strong>{completedVerificationCount} de 3 verificaciones completadas</strong></div>}
-            
-            <div className={`form-pair security-item security-identity ${identityCollapsed ? "is-collapsed" : ""}`} style={{ display: currentStep === 1 ? "grid" : "none" }}>
-              <div className="security-item-heading"><span>1</span><div><b>Identidad</b><small>{identityComplete ? "✓ Datos de contacto completos" : "Documento y teléfono requeridos"}</small></div><em className={`security-${identityStatus}`}>{verificationStatusLabel[identityStatus]}</em>{identityComplete && <button className="security-edit" type="button" onClick={() => setEditingIdentity((editing) => !editing)}>{editingIdentity ? "Listo" : "Editar"}</button>}</div>
-              {!identityCollapsed && <>
+            <p style={{ margin: "0 0 8px", fontFamily: "Space Grotesk", fontSize: "0.75rem", fontWeight: 700, color: "#93c5fd", letterSpacing: "0.08em" }}>
+              🔐 ENROLAMIENTO: IDENTIDAD, PASSKEY (HUELLA/FACE ID) & DLP BANCARIO
+            </p>
+
+            <div className="form-pair" style={{ display: currentStep === 1 ? "grid" : "none" }}>
               <label style={{ fontSize: "0.72rem" }}>
                 Documento de Identidad (ID / Pasaporte):
                 <input value={userIdDoc} onChange={(e) => setUserIdDoc(e.target.value)} onFocus={() => setSensitiveFieldFocused(true)} onBlur={() => setSensitiveFieldFocused(false)} placeholder="PASSPORT-AR-948291" style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
@@ -389,8 +386,8 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
               <label style={{ display: currentStep === 2 ? "grid" : "none", fontSize: "0.72rem" }}>
                 💳 Método de Pago (Stripe Elements / Scoped Token):
                 <div style={{ display: "flex", gap: "6px" }}>
-                  <input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} onFocus={() => setSensitiveFieldFocused(true)} onBlur={() => setSensitiveFieldFocused(false)} placeholder="•••• •••• •••• 4242" style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
-                  <button type="button" onClick={async () => { try { const token = await handleTokenizeCard(); if (token) setTokenVerified(true); } catch (e) { console.warn(e); } }} style={{ background: tokenVerified ? "rgba(16, 185, 129, 0.45)" : "rgba(59, 130, 246, 0.2)", border: tokenVerified ? "1px solid #10b981" : "1px solid #3b82f6", color: tokenVerified ? "#6ee7b7" : "#93c5fd", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: "0 10px", whiteSpace: "nowrap" }}>{tokenVerified ? "✓ Método tokenizado" : "Tokenizar método"}</button>
+                  <input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="•••• •••• •••• 4242" style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
+                  <button type="button" onClick={async () => { try { const token = await handleTokenizeCard(cardNumber); if (token) setTokenVerified(true); } catch (e) { console.warn(e); } }} style={{ background: tokenVerified ? "rgba(16, 185, 129, 0.45)" : "rgba(59, 130, 246, 0.2)", border: tokenVerified ? "1px solid #10b981" : "1px solid #3b82f6", color: tokenVerified ? "#6ee7b7" : "#93c5fd", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: "0 10px", whiteSpace: "nowrap" }}>{tokenVerified ? "✓" : "🛡️ Tokenizar"}</button>
                 </div>
               </label>
               {!smsCollapsed && <label style={{ display: currentStep === 1 ? "grid" : "none", fontSize: "0.72rem" }}>
@@ -403,10 +400,8 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
               </label>}
             </div>
 
-
-            <div className={`security-item security-biometric ${biometricCollapsed ? "is-collapsed" : ""}`} style={{ display: currentStep === 1 ? "flex" : "none", gap: "10px", marginTop: "10px", flexWrap: "wrap", alignItems: "center" }}>
-              <div className="security-item-heading"><span>2</span><div><b>Biometría</b><small>{passkeyVerified ? "✓ Identidad verificada" : showBioModal ? "Verificando tu presencia…" : "Confirma con Face ID o huella"}</small></div><em className={`security-${biometricStatus}`}>{verificationStatusLabel[biometricStatus]}</em>{passkeyVerified && <button className="security-edit" type="button" onClick={() => { setEditingBiometric(true); setPasskeyVerified(false); }}>Editar</button>}</div>
-              {!biometricCollapsed && <button
+            <div style={{ display: currentStep === 1 ? "flex" : "none", gap: "10px", marginTop: "10px", flexWrap: "wrap", alignItems: "center" }}>
+              <button
                 type="button"
                 onClick={openBiometricsModal}
                 disabled={passkeyVerified}
@@ -430,9 +425,12 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
             <h3>Confirma y autoriza</h3>
             <div className="permission-summary"><span>ASÍ SE VERÁ TU PERMISO</span><p>{summary}</p></div>
           </div>
+
           {(error || securityError) && <div className="form-error" role="alert">{error || securityError}</div>}
-          {currentStep === 1 && !stepOneReady && <p className="wizard-notice">Para continuar, completa la identidad, la biometría y la verificación por SMS.</p>}
-          {currentStep === 2 && !tokenVerified && <p className="wizard-notice">Tokeniza tu método de pago seguro para continuar.</p>}
+
+          {currentStep === 1 && !(passkeyVerified && smsVerified) && <p className="wizard-notice">Para continuar, completa {passkeyVerified ? "la verificación por SMS" : smsVerified ? "la verificación biométrica" : "la biometría y la verificación por SMS"}.</p>}
+          {currentStep === 3 && !tokenVerified && <p className="wizard-notice">Tokeniza tu método de pago seguro para continuar.</p>}
+
           <div className="wizard-navigation">
             {currentStep > 1 && <button className="wizard-back" type="button" onClick={() => setCurrentStep((currentStep - 1) as 1 | 2 | 3 | 4)}>← Atrás</button>}
             {currentStep === 1 && <button className="wizard-next" type="button" disabled={!stepOneReady} onClick={() => setCurrentStep(2)}>Siguiente →</button>}

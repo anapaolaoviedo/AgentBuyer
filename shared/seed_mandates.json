@@ -39,7 +39,10 @@
         "travel.flights"
       ],
       "allowed_merchants": [
-        "mch_vuelaya"
+        "mch_vuelaya",
+        "mch_despegar",
+        "mch_kayak",
+        "mch_expedia"
       ],
       "max_uses": 3,
       "conditions": [
