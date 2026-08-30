@@ -19,6 +19,10 @@ export function auditTypeLabel(type: string): string {
     revocation: "revocación",
     purchase_completed: "compra completada",
     agent_run: "corrida del agente",
+    human_override_approved: "aprobación humana",
+    human_override_declined: "rechazo humano",
+    DISPUTE_FILED: "disputa abierta",
+    DISPUTE_RESOLVED: "disputa resuelta",
   };
   return labels[type] ?? type.replace(/_/g, " ");
 }

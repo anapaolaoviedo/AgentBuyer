@@ -22,6 +22,14 @@ function endOfMonth() {
   return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
 }
 
+// Fecha cercana (~2 semanas) para que la búsqueda web real devuelva resultados
+// de forma confiable — las fechas muy lejanas suelen no tener tarifas publicadas.
+function nearTermDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + 14);
+  return d.toISOString().slice(0, 10);
+}
+
 function safeId(value: string, prefix: string) {
   const readable = value.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "persona";
   return `${prefix}_${readable}_${Date.now().toString(36)}`;
@@ -36,9 +44,11 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
   const [priceBelow, setPriceBelow] = useState("150");
   const [validUntil, setValidUntil] = useState(endOfMonth());
   // Estos datos viajan con el permiso para que Saturday pueda buscar la ruta real.
+  // Ruta por defecto BUE→COR con fecha cercana: combinación confirmada que
+  // la búsqueda web real devuelve de forma confiable para la demo.
   const [flightOrigin, setFlightOrigin] = useState("BUE");
   const [flightDestination, setFlightDestination] = useState("COR");
-  const [departureDate, setDepartureDate] = useState("");
+  const [departureDate, setDepartureDate] = useState(nearTermDate());
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
   
   // 🛡️ Identidad y Datos Bancarios DLP
