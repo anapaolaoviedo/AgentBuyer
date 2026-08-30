@@ -1,6 +1,6 @@
 name: tests
 
-# Puerta de merge: ningún PR entra a main sin la suite completa en verde.
+# Puerta de merge: ningún PR entra a main sin backend (pytest) Y frontend (build) en verde.
 on:
   pull_request:
   push:
@@ -17,3 +17,17 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: pytest -q
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # `npm run build` = `tsc -b && vite build`: falla ante cualquier error de
+      # TypeScript/JSX, atrapando las páginas en blanco antes del merge.
+      - run: npm install
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
