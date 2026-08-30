@@ -19,7 +19,9 @@ def enviar_ticket_confirmacion(correo_destino: str, detalles_reserva: dict) -> d
     """
     dest = (correo_destino or "").strip()
     if not dest or "@" not in dest:
-        dest = SMTP_USER or "saturday.agentbuyer@gmail.com"
+        # Nunca auto-enviarse el recibo: sin correo del titular, no hay envío.
+        print("[Ticket email] Skipped: the mandate has no cardholder email; not sending the receipt to the sender itself.")
+        return {"status": 200, "message": "Skipped: no recipient email on the mandate.", "sent_to": None}
 
     pnr = detalles_reserva.get('pnr', 'PNR-VYA-849201')
     orden_id = detalles_reserva.get('orden_id', 'ORD-8492-1570')

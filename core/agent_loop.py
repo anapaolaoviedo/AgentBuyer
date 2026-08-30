@@ -274,7 +274,9 @@ def run_agent(mandate_id: str, search_fields: dict | None = None) -> dict:
         )
         try:
             from core.notifications import enviar_ticket_confirmacion
-            user_email = mandate.get("human", {}).get("email") or os.environ.get("SMTP_USER", "")
+            # Solo el correo del titular; sin él, notifications omite el envío
+            # (jamás caer a SMTP_USER: eso mandaba el recibo al propio emisor).
+            user_email = mandate.get("human", {}).get("email") or ""
             enviar_ticket_confirmacion(
                 correo_destino=user_email,
                 detalles_reserva={

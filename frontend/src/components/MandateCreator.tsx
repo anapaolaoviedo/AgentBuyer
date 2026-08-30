@@ -165,30 +165,23 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
   // 🛡️ Identidad y Datos Bancarios DLP (valores demo de Marta, editables)
   const [userIdDoc, setUserIdDoc] = useState("PASSPORT-AR-948291");
   const [userPhone, setUserPhone] = useState("+52 56 1447 3083");
+  // El correo sigue capturándose: es el destino del recibo de compra.
   const [userEmail, setUserEmail] = useState("marta@example.com");
-  // Canal del código de verificación: SMS al teléfono o correo electrónico.
-  const [otpChannel, setOtpChannel] = useState<"sms" | "email">("sms");
-  // El backend ahora genera códigos aleatorios; en modo demo (sin Twilio/SMTP)
-  // devuelve code_demo en la respuesta y el campo se autollena al enviar.
-  const [smsOtp, setSmsOtp] = useState("");
   const [cardNumber, setCardNumber] = useState("4242 4242 4242 4242");
 
   // Modal y Hooks Biométicos
   const [showBioModal, setShowBioModal] = useState(false);
   const [bioMode, setBioMode] = useState<"camera" | "fingerprint">("camera");
   const [passkeyVerified, setPasskeyVerified] = useState(false);
-  const [smsVerified, setSmsVerified] = useState(false);
-  const [smsCodeSent, setSmsCodeSent] = useState(false);
   const [tokenVerified, setTokenVerified] = useState(false);
   const [sensitiveFieldFocused, setSensitiveFieldFocused] = useState(false);
   const [editingIdentity, setEditingIdentity] = useState(false);
   const [editingBiometric, setEditingBiometric] = useState(false);
-  const [editingSms, setEditingSms] = useState(false);
   const [microExpression, setMicroExpression] = useState<SaturdayExpression | null>(null);
   const expressionTimer = useRef<number | null>(null);
 
-  const { videoRef, livenessState, startCamera, stopCamera, verifyFacePresence, sendSmsCode, verifySmsCode } = useLivenessVerification();
-  const { handlePasskeyChallenge, handleTokenizeCard, sendOtp, verifyOtp, isSubmitEnabled, isStripeTokenized, isPossessionVerified, paymentMethodId, errorMessage: securityError, isLoading: securityLoading } = useZeroTrustSecurity();
+  const { videoRef, livenessState, startCamera, stopCamera, verifyFacePresence } = useLivenessVerification();
+  const { handlePasskeyChallenge, handleTokenizeCard, paymentMethodId, errorMessage: securityError } = useZeroTrustSecurity();
 
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -199,21 +192,18 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
   const phoneDigits = userPhone.replace(/\D/g, "");
   const phoneComplete = phoneDigits.length >= 10;
   const emailComplete = /^\S+@\S+\.\S+$/.test(userEmail.trim());
-  const otpContactReady = otpChannel === "sms" ? phoneComplete : emailComplete;
-  const identityComplete = Boolean(userIdDoc.trim() && phoneComplete);
+  const identityComplete = Boolean(userIdDoc.trim() && phoneComplete && emailComplete);
   const identityCollapsed = identityComplete && !editingIdentity;
   const biometricCollapsed = passkeyVerified && !editingBiometric;
-  const smsCollapsed = smsVerified && !editingSms;
-  const stepOneReady = Boolean(identityComplete && smsOtp.trim() && passkeyVerified && smsVerified);
-  const completedVerificationCount = Number(identityComplete) + Number(passkeyVerified) + Number(smsVerified);
-  const identityStatus = verificationStatus(identityComplete, Boolean(userIdDoc.trim() || userPhone.trim()));
+  const stepOneReady = Boolean(identityComplete && passkeyVerified);
+  const completedVerificationCount = Number(identityComplete) + Number(passkeyVerified);
+  const identityStatus = verificationStatus(identityComplete, Boolean(userIdDoc.trim() || userPhone.trim() || userEmail.trim()));
   const biometricStatus = verificationStatus(passkeyVerified, showBioModal);
-  const smsStatus = verificationStatus(smsVerified, smsCodeSent);
   const saturdayExpression: SaturdayExpression | undefined = sensitiveFieldFocused
     ? "covering"
     : microExpression ?? (stepOneReady || (currentStep === 2 && tokenVerified) ? "ready" : undefined);
   const summary = useMemo(
-    () => `Saturday will be able to buy ${selectedCategory.toLowerCase()} at ${selectedMerchant}, up to $${maxAmount || "—"} per purchase, at most ${maxUses || "—"} times, only if the price drops below $${priceBelow || "—"}${validUntil ? `, valid until ${validUntil}.` : "."} (Enrolled with Passkey + SMS OTP + DLP Token).`,
+    () => `Saturday will be able to buy ${selectedCategory.toLowerCase()} at ${selectedMerchant}, up to $${maxAmount || "—"} per purchase, at most ${maxUses || "—"} times, only if the price drops below $${priceBelow || "—"}${validUntil ? `, valid until ${validUntil}.` : "."} (Enrolled with Passkey + DLP Token).`,
     [humanName, maxAmount, maxUses, priceBelow, selectedCategory, selectedMerchant, validUntil],
   );
 
@@ -307,11 +297,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
       },
       authentication: {
         passkey_biometrics: passkeyVerified ? "verified_webauthn_touch_id" : "unverified",
-        sms_otp_confirmed: smsVerified,
-        email_otp_confirmed: otpChannel === "email" && smsVerified,
-        sms_code: smsOtp,
-        otp_channel: otpChannel,
-        verified_email: userEmail.trim(),
+        receipt_email: userEmail.trim(),
       },
       payment_token: {
         token_id: paymentMethodId || `vtok_${Math.random().toString(36).slice(2, 10)}`,
@@ -412,17 +398,17 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
             <h3>{currentStep === 1 ? "Verify it's you" : "Secure payment method"}</h3>
 
             {currentStep === 1 && <>
-              <p className="verify-subtitle">Three quick verifications, in order: your identity, your biometrics, and a verification code.</p>
+              <p className="verify-subtitle">Two quick verifications, in order: your identity and your biometrics.</p>
               <div className="verify-progress" role="status">
-                <span>{completedVerificationCount} of 3 verifications completed</span>
-                <div className="verify-progress-bar" aria-hidden="true"><i style={{ width: `${Math.round((completedVerificationCount / 3) * 100)}%` }} /></div>
+                <span>{completedVerificationCount} of 2 verifications completed</span>
+                <div className="verify-progress-bar" aria-hidden="true"><i style={{ width: `${Math.round((completedVerificationCount / 2) * 100)}%` }} /></div>
               </div>
 
               {/* a) Identidad: documento + teléfono */}
               <section className={`verify-item is-${identityStatus}`}>
                 <header className="verify-item-heading">
                   <span className="verify-item-number" aria-hidden="true">{identityComplete ? "✓" : "1"}</span>
-                  <div className="verify-item-title"><b>Identity</b><small>{identityComplete ? "Document and phone captured" : "Enter your document and your phone"}</small></div>
+                  <div className="verify-item-title"><b>Identity</b><small>{identityComplete ? "Document, phone, and email captured" : "Enter your document, phone, and email"}</small></div>
                   <em className={`verify-chip is-${identityStatus}`}>{verificationStatusLabel[identityStatus]}</em>
                   {identityComplete && <button className="verify-edit" type="button" onClick={() => setEditingIdentity((editing) => !editing)}>{editingIdentity ? "Done" : "Edit"}</button>}
                 </header>
@@ -434,11 +420,18 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
                     </label>
                     <label>
                       Contact phone
-                      <input value={userPhone} onChange={(e) => { setUserPhone(e.target.value); if (otpChannel === "sms") { setSmsVerified(false); setSmsCodeSent(false); setEditingSms(false); } }} inputMode="tel" placeholder="+52 56 1447 3083" />
+                      <input value={userPhone} onChange={(e) => setUserPhone(e.target.value)} inputMode="tel" placeholder="+52 56 1447 3083" />
                     </label>
                   </div>
+                  <label>
+                    Email for your purchase receipt
+                    <input value={userEmail} onChange={(e) => setUserEmail(e.target.value)} onFocus={() => setSensitiveFieldFocused(true)} onBlur={() => setSensitiveFieldFocused(false)} type="email" inputMode="email" placeholder="marta@example.com" />
+                  </label>
                   {userPhone.trim() !== "" && !phoneComplete && (
                     <p className="verify-hint verify-hint-warn">Enter a complete phone number (at least 10 digits).</p>
+                  )}
+                  {userEmail.trim() !== "" && !emailComplete && (
+                    <p className="verify-hint verify-hint-warn">Enter a valid email (name@domain.com) — your receipt will be sent there.</p>
                   )}
                 </div>}
               </section>
@@ -457,49 +450,6 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
                 </div>}
               </section>
 
-              {/* c) Código de verificación: por SMS o por correo — enviar y luego verificar */}
-              <section className={`verify-item is-${smsStatus}`}>
-                <header className="verify-item-heading">
-                  <span className="verify-item-number" aria-hidden="true">{smsVerified ? "✓" : "3"}</span>
-                  <div className="verify-item-title"><b>Verification code</b><small>{smsVerified ? `Code verified via ${otpChannel === "email" ? "email" : "SMS"}` : "Receive a code by SMS or email and confirm it"}</small></div>
-                  <em className={`verify-chip is-${smsStatus}`}>{verificationStatusLabel[smsStatus]}</em>
-                  {smsVerified && <button className="verify-edit" type="button" onClick={() => setEditingSms((editing) => !editing)}>{editingSms ? "Done" : "Edit"}</button>}
-                </header>
-                {!smsCollapsed && <div className="verify-item-body">
-                  <div className="verify-tabs" role="tablist" aria-label="Verification method">
-                    <button className={`verify-tab ${otpChannel === "sms" ? "is-active" : ""}`} type="button" role="tab" aria-selected={otpChannel === "sms"} onClick={() => { if (otpChannel !== "sms") { setOtpChannel("sms"); setSmsVerified(false); setSmsCodeSent(false); setSmsOtp(""); } }}>📱 SMS</button>
-                    <button className={`verify-tab ${otpChannel === "email" ? "is-active" : ""}`} type="button" role="tab" aria-selected={otpChannel === "email"} onClick={() => { if (otpChannel !== "email") { setOtpChannel("email"); setSmsVerified(false); setSmsCodeSent(false); setSmsOtp(""); } }}>📧 Email</button>
-                  </div>
-                  {otpChannel === "email" && <>
-                    <label>
-                      Email address for the code
-                      <input value={userEmail} onChange={(e) => { setUserEmail(e.target.value); setSmsVerified(false); setSmsCodeSent(false); }} onFocus={() => setSensitiveFieldFocused(true)} onBlur={() => setSensitiveFieldFocused(false)} type="email" inputMode="email" placeholder="marta@example.com" />
-                    </label>
-                    <p className="verify-hint verify-hint-tip">Recommended: use the same email where you want to receive your purchase receipt.</p>
-                    {userEmail.trim() !== "" && !emailComplete && <p className="verify-hint verify-hint-warn">Enter a valid email (name@domain.com).</p>}
-                  </>}
-                  <div className="sms-code-controls">
-                    <button className="verify-action" type="button" disabled={securityLoading || !otpContactReady} onClick={async () => { try { const res = await sendOtp(otpChannel === "email" ? userEmail : userPhone, otpChannel); setSmsCodeSent(true); const demoCode = typeof res?.code_demo === "string" && /^\d{6}$/.test(res.code_demo) ? res.code_demo : ""; if (demoCode) setSmsOtp(demoCode); } catch (e) { console.warn(e); } }}>
-                      {smsCodeSent ? "Resend code" : otpChannel === "email" ? "Send code by email" : "Send SMS code"}
-                    </button>
-                    <input value={smsOtp} onChange={(e) => { setSmsOtp(e.target.value); setSmsVerified(false); }} onFocus={() => setSensitiveFieldFocused(true)} onBlur={() => setSensitiveFieldFocused(false)} placeholder="6-digit code" maxLength={6} inputMode="numeric" aria-label="6-digit code received" />
-                    <button className="verify-action verify-action-confirm" type="button" disabled={securityLoading || !smsOtp.trim()} onClick={async () => { try { const res = await verifyOtp(otpChannel === "email" ? userEmail : userPhone, smsOtp, otpChannel); if (res) { setSmsVerified(true); setEditingSms(false); showMicroExpression("nodding"); } } catch (e) { console.warn(e); } }}>
-                      Verify code
-                    </button>
-                  </div>
-                  <p className="verify-hint">
-                    {!otpContactReady
-                      ? otpChannel === "sms"
-                        ? "First enter a complete phone number (at least 10 digits) in step 1."
-                        : "First enter your email address above."
-                      : smsCodeSent
-                        ? `Code sent to ${otpChannel === "email" ? userEmail : userPhone}. Type it and press “Verify code”.`
-                        : otpChannel === "email"
-                          ? "Press “Send code by email” to receive it in your inbox."
-                          : "Press “Send SMS code” to receive it on your phone."}
-                  </p>
-                </div>}
-              </section>
             </>}
 
             {currentStep === 2 && (
@@ -528,7 +478,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
 
           {(error || securityError) && <div className="form-error" role="alert">{error || securityError}</div>}
 
-          {currentStep === 1 && !(passkeyVerified && smsVerified) && <p className="wizard-notice">To continue, complete {passkeyVerified ? "the code verification" : smsVerified ? "the biometric verification" : "the biometric and code verifications"}.</p>}
+          {currentStep === 1 && !stepOneReady && <p className="wizard-notice">To continue, complete {identityComplete ? "the biometric verification" : passkeyVerified ? "your identity details" : "your identity details and the biometric verification"}.</p>}
           {currentStep === 2 && !tokenVerified && <p className="wizard-notice">Tokenize your secure payment method to continue.</p>}
 
           <div className="wizard-navigation">
@@ -536,7 +486,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
             {currentStep === 1 && <button className="wizard-next" type="button" disabled={!stepOneReady} onClick={() => setCurrentStep(2)}>Next →</button>}
             {currentStep === 2 && <button className="wizard-next" type="button" disabled={!tokenVerified} onClick={() => setCurrentStep(3)}>Next →</button>}
             {currentStep === 3 && <button className="wizard-next" type="button" onClick={() => setCurrentStep(4)}>Next →</button>}
-            {currentStep === 4 && <button className="authorize-button" disabled={creating || !(passkeyVerified && smsVerified && tokenVerified)} type="submit">{creating ? "CREATING YOUR PERMISSION…" : !passkeyVerified ? "⚠ BIOMETRICS MISSING" : !smsVerified ? "⚠ OTP CODE MISSING" : !tokenVerified ? "⚠ BANK TOKEN MISSING" : "AUTHORIZE SATURDAY"}</button>}
+            {currentStep === 4 && <button className="authorize-button" disabled={creating || !(passkeyVerified && tokenVerified)} type="submit">{creating ? "CREATING YOUR PERMISSION…" : !passkeyVerified ? "⚠ BIOMETRICS MISSING" : !tokenVerified ? "⚠ BANK TOKEN MISSING" : "AUTHORIZE SATURDAY"}</button>}
           </div>
         </form>
       </section>

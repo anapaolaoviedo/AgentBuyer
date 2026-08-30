@@ -601,7 +601,8 @@ def api_webhook_travel_provider(payload: dict):
     pnr = payload.get("pnr", "PNR-VYA-849201")
     flight_id = payload.get("flight_id", "FLIGHT_COR_130")
     status_str = payload.get("status", "TICKET_ISSUED")
-    user_email = payload.get("email") or os.getenv("SMTP_USER", "")
+    # Sin correo en el payload no se envía nada (nunca auto-enviarse el boleto).
+    user_email = payload.get("email") or ""
 
     append_entry({
         "type": "settlement_completed",
