@@ -335,28 +335,11 @@ export function useLivenessVerification() {
       }));
       return data;
     } catch (err: any) {
-      // Validación fallback si el servidor está en modo local
-      if (sanitized === "849201" || /^\d{6}$/.test(sanitized)) {
-        const fallbackResponse: OtpVerifyResponse = {
-          success: true,
-          verified: true,
-          phone,
-          verifiedAt: new Date().toISOString(),
-        };
-        setSmsState((prev) => ({
-          ...prev,
-          isVerifying: false,
-          isSmsVerified: true,
-          error: null,
-        }));
-        return fallbackResponse;
-      }
-
       setSmsState((prev) => ({
         ...prev,
         isVerifying: false,
         isSmsVerified: false,
-        error: err.message || "Código SMS incorrecto.",
+        error: err.message || "Código de verificación incorrecto o expirado.",
       }));
       throw err;
     }

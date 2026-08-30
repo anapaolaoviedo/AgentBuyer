@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState, useEffect } from "react";
+﻿import { FormEvent, useMemo, useState, useEffect } from "react";
 import Saturday from "./Saturday";
 import { useLivenessVerification } from "../hooks/useLivenessVerification";
 import { useZeroTrustSecurity } from "../hooks/useZeroTrustSecurity";
@@ -22,8 +22,6 @@ function endOfMonth() {
   return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
 }
 
-// Fecha cercana (~2 semanas) para que la búsqueda web real devuelva resultados
-// de forma confiable — las fechas muy lejanas suelen no tener tarifas publicadas.
 function nearTermDate() {
   const d = new Date();
   d.setDate(d.getDate() + 14);
@@ -43,9 +41,6 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
   const [maxUses, setMaxUses] = useState("3");
   const [priceBelow, setPriceBelow] = useState("150");
   const [validUntil, setValidUntil] = useState(endOfMonth());
-  // Estos datos viajan con el permiso para que Saturday pueda buscar la ruta real.
-  // Ruta por defecto BUE→COR con fecha cercana: combinación confirmada que
-  // la búsqueda web real devuelve de forma confiable para la demo.
   const [flightOrigin, setFlightOrigin] = useState("BUE");
   const [flightDestination, setFlightDestination] = useState("COR");
   const [departureDate, setDepartureDate] = useState(nearTermDate());
@@ -53,19 +48,32 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
 
   // 🛡️ Identidad y Datos Bancarios DLP
   const [userIdDoc, setUserIdDoc] = useState("PASSPORT-AR-948291");
-  const [userPhone, setUserPhone] = useState("5614473083");
-  const [smsOtp, setSmsOtp] = useState("849201");
+  const [userEmail, setUserEmail] = useState("diegogalvanpalacios@gmail.com");
+  const [userPhone, setUserPhone] = useState("+52 55 1234 5678");
+  const [emailOtp, setEmailOtp] = useState("");
+  const [smsOtp, setSmsOtp] = useState("");
   const [cardNumber, setCardNumber] = useState("•••• •••• •••• 4242");
+  const [isSendingEmailOtp, setIsSendingEmailOtp] = useState(false);
 
   // Modal y Hooks Biométicos
   const [showBioModal, setShowBioModal] = useState(false);
   const [bioMode, setBioMode] = useState<"camera" | "fingerprint">("camera");
   const [passkeyVerified, setPasskeyVerified] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
   const [smsVerified, setSmsVerified] = useState(false);
   const [tokenVerified, setTokenVerified] = useState(false);
 
-  const { videoRef, livenessState, startCamera, stopCamera, verifyFacePresence, sendSmsCode, verifySmsCode } = useLivenessVerification();
-  const { handlePasskeyChallenge, handleTokenizeCard, sendOtp, verifyOtp, isSubmitEnabled, isStripeTokenized, isPossessionVerified, paymentMethodId, errorMessage: securityError, isLoading: securityLoading } = useZeroTrustSecurity();
+  const { videoRef, livenessState, startCamera, stopCamera, verifyFacePresence } = useLivenessVerification();
+  const { handlePasskeyChallenge, handleTokenizeCard, sendOtp, verifyOtp, isStripeTokenized, paymentMethodId, errorMessage: securityError } = useZeroTrustSecurity();
+
+  // Auto-tokenización reactiva de tarjeta
+  useEffect(() => {
+    if (cardNumber && cardNumber.trim().length >= 4) {
+      handleTokenizeCard(cardNumber).then((tok) => {
+        if (tok) setTokenVerified(true);
+      }).catch(() => {});
+    }
+  }, [cardNumber, handleTokenizeCard]);
 
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -73,7 +81,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
   const selectedCategory = categories.find((item) => item.value === category)?.label ?? category;
   const selectedMerchant = merchants.find((item) => item.value === merchant)?.label ?? merchant;
   const summary = useMemo(
-    () => `Saturday podrá comprar ${selectedCategory.toLowerCase()} en ${selectedMerchant}, hasta $${maxAmount || "—"} por compra, máximo ${maxUses || "—"} veces, solo si el precio baja de $${priceBelow || "—"}${validUntil ? `, válido hasta ${validUntil}.` : "."} (Enrolado con Passkey + SMS OTP + Token DLP).`,
+    () => `Saturday podrá comprar ${selectedCategory.toLowerCase()} en ${selectedMerchant}, hasta $${maxAmount || "—"} por compra, máximo ${maxUses || "—"} veces, solo si el precio baja de $${priceBelow || "—"}${validUntil ? `, válido hasta ${validUntil}.` : "."} (Enrolado con Passkey + Correo OTP + Token DLP).`,
     [humanName, maxAmount, maxUses, priceBelow, selectedCategory, selectedMerchant, validUntil],
   );
 
@@ -123,6 +131,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
       human: {
         id: safeId(humanName, "hum"),
         display_name: humanName.trim(),
+        email: userEmail.trim(),
         id_document: userIdDoc,
         phone: userPhone,
       },
@@ -145,8 +154,9 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
       },
       authentication: {
         passkey_biometrics: passkeyVerified ? "verified_webauthn_touch_id" : "unverified",
+        email_otp_confirmed: emailVerified,
         sms_otp_confirmed: smsVerified,
-        sms_code: smsOtp,
+        verified_email: userEmail.trim(),
       },
       payment_token: {
         token_id: paymentMethodId || `vtok_${Math.random().toString(36).slice(2, 10)}`,
@@ -217,65 +227,73 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
             <span className={currentStep === 4 ? "is-current" : ""}>4. Confirma</span>
           </div>
 
-          <div className="wizard-step" style={{ display: currentStep === 2 ? "grid" : "none" }}>
-            <h3>Define los límites</h3>
-            <label>¿Quién autoriza?<input value={humanName} onChange={(event) => setHumanName(event.target.value)} placeholder="Tu nombre" required /></label>
-            <label>¿Cuánto puede gastar como máximo en cada compra?<div className="money-field"><span>USD $</span><input value={maxAmount} onChange={(event) => setMaxAmount(event.target.value)} inputMode="decimal" placeholder="150" required /></div></label>
-            <div className="form-pair">
-              <label>¿En qué puede gastar?<select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-              <label>¿En qué comercios?<select value={merchant} onChange={(event) => setMerchant(event.target.value)}>{merchants.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-            </div>
-            <div className="form-pair">
-              <label>¿Cuántas compras puede hacer como máximo?<input value={maxUses} onChange={(event) => setMaxUses(event.target.value)} inputMode="numeric" placeholder="3" required /></label>
-              <label>¿Hasta cuándo es válido este permiso?<input type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></label>
-            </div>
-            <label>¿Alguna condición de precio?<div className="price-condition"><span>Solo si el precio baja de USD $</span><input value={priceBelow} onChange={(event) => setPriceBelow(event.target.value)} inputMode="decimal" placeholder="150" required /></div></label>
-          </div>
-
-          {category === "travel.flights" && currentStep === 2 && <div className="wizard-step flight-search-step">
-            <div className="form-pair">
-              <label>Origen<input value={flightOrigin} onChange={(event) => setFlightOrigin(event.target.value)} placeholder="BUE o Buenos Aires" required /></label>
-              <label>Destino<input value={flightDestination} onChange={(event) => setFlightDestination(event.target.value)} placeholder="COR o Ciudad de México" required /></label>
-            </div>
-            <label>Fecha de salida<input type="date" value={departureDate} onChange={(event) => setDepartureDate(event.target.value)} min={new Date().toISOString().slice(0, 10)} required /></label>
-          </div>}
-
-          <div className="wizard-step wizard-security-step" style={{ display: currentStep === 1 || currentStep === 3 ? "block" : "none", background: "rgba(30, 41, 59, 0.6)", padding: "14px", borderRadius: "10px", border: "1px solid rgba(77, 124, 255, 0.35)", marginTop: "4px" }}>
-            <h3>{currentStep === 1 ? "Verifica que eres tú" : "Método de pago seguro"}</h3>
-            <p style={{ margin: "0 0 8px", fontFamily: "Space Grotesk", fontSize: "0.75rem", fontWeight: 700, color: "#93c5fd", letterSpacing: "0.08em" }}>
-              🔐 ENROLAMIENTO: IDENTIDAD, PASSKEY (HUELLA/FACE ID) & DLP BANCARIO
+          {/* PASO 1: VERIFICACIÓN ZERO-TRUST (CORREO OTP + BIOMETRÍA) */}
+          <div className="wizard-step wizard-security-step" style={{ display: currentStep === 1 ? "block" : "none", background: "rgba(30, 41, 59, 0.6)", padding: "14px", borderRadius: "10px", border: "1px solid rgba(77, 124, 255, 0.35)", marginTop: "4px" }}>
+            <h3>1. Verifica que eres tú (Identidad y Correo)</h3>
+            <p style={{ margin: "0 0 10px", fontFamily: "Space Grotesk", fontSize: "0.75rem", fontWeight: 700, color: "#93c5fd", letterSpacing: "0.08em" }}>
+              🔐 ENROLAMIENTO: CORREO OTP, DOCUMENTO & PASSKEY
             </p>
 
-            <div className="form-pair" style={{ display: currentStep === 1 ? "grid" : "none" }}>
+            <div className="form-pair">
               <label style={{ fontSize: "0.72rem" }}>
                 Documento de Identidad (ID / Pasaporte):
                 <input value={userIdDoc} onChange={(e) => setUserIdDoc(e.target.value)} placeholder="PASSPORT-AR-948291" style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
               </label>
               <label style={{ fontSize: "0.72rem" }}>
-                Teléfono para SMS OTP:
-                <input value={userPhone} onChange={(e) => setUserPhone(e.target.value)} placeholder="+54 9 11 5829-1039" style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
+                Correo Electrónico (para OTP y Ticket Final):
+                <input value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="tu-correo@gmail.com" type="email" required style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
               </label>
             </div>
 
-            <div className="form-pair" style={{ marginTop: "8px" }}>
-              <label style={{ display: currentStep === 3 ? "grid" : "none", fontSize: "0.72rem" }}>
-                💳 Método de Pago (Stripe Elements / Scoped Token):
-                <div style={{ display: "flex", gap: "6px" }}>
-                  <input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="•••• •••• •••• 4242" style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
-                  <button type="button" onClick={async () => { try { const token = await handleTokenizeCard(cardNumber); if (token) setTokenVerified(true); } catch (e) { console.warn(e); } }} style={{ background: tokenVerified ? "rgba(16, 185, 129, 0.45)" : "rgba(59, 130, 246, 0.2)", border: tokenVerified ? "1px solid #10b981" : "1px solid #3b82f6", color: tokenVerified ? "#6ee7b7" : "#93c5fd", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: "0 10px", whiteSpace: "nowrap" }}>{tokenVerified ? "✓" : "🛡️ Tokenizar"}</button>
-                </div>
-              </label>
-              <label style={{ display: currentStep === 1 ? "grid" : "none", fontSize: "0.72rem" }}>
-                Código SMS (OTP):
-                <div style={{ display: "flex", gap: "6px" }}>
-                  <input value={smsOtp} onChange={(e) => setSmsOtp(e.target.value)} placeholder="849201" maxLength={6} style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
-                  <button type="button" onClick={async () => { try { await sendOtp(userPhone, "sms"); } catch(e) { console.warn(e); } }} style={{ background: "rgba(59, 130, 246, 0.2)", border: "1px solid #3b82f6", color: "#93c5fd", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: "0 8px", whiteSpace: "nowrap" }}>📲 Enviar</button>
-                  <button type="button" onClick={async () => { try { const res = await verifyOtp(userPhone, smsOtp, "sms"); if (res) setSmsVerified(true); } catch(e) { console.warn(e); } }} style={{ background: smsVerified ? "rgba(16, 185, 129, 0.45)" : "rgba(16, 185, 129, 0.25)", border: "1px solid #10b981", color: "#6ee7b7", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: "0 10px" }}>{smsVerified ? "✓" : "OK"}</button>
+            <div style={{ marginTop: "10px" }}>
+              <label style={{ fontSize: "0.72rem" }}>
+                Código de Verificación OTP (6 dígitos):
+                <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
+                  <input value={emailOtp} onChange={(e) => setEmailOtp(e.target.value)} placeholder="Ingresa los 6 dígitos" maxLength={6} style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
+                  <button
+                    type="button"
+                    disabled={isSendingEmailOtp}
+                    onClick={async () => {
+                      if (!userEmail.includes("@")) {
+                        setError("Ingresa un correo electrónico válido.");
+                        return;
+                      }
+                      setIsSendingEmailOtp(true);
+                      try {
+                        await sendOtp(userEmail, "email");
+                        setError(null);
+                      } catch(e: any) {
+                        setError(e?.message || "No se pudo enviar el correo de verificación.");
+                      } finally {
+                        setIsSendingEmailOtp(false);
+                      }
+                    }}
+                    style={{ background: "rgba(59, 130, 246, 0.2)", border: "1px solid #3b82f6", color: "#93c5fd", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: "0 10px", whiteSpace: "nowrap" }}
+                  >
+                    {isSendingEmailOtp ? "Enviando…" : "✉️ Enviar a Gmail"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const res = await verifyOtp(userEmail, emailOtp, "email");
+                        if (res) {
+                          setEmailVerified(true);
+                          setError(null);
+                        }
+                      } catch(e: any) {
+                        setError(e?.message || "Código OTP incorrecto o expirado.");
+                      }
+                    }}
+                    style={{ background: emailVerified ? "rgba(16, 185, 129, 0.45)" : "rgba(16, 185, 129, 0.25)", border: "1px solid #10b981", color: "#6ee7b7", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: "0 12px" }}
+                  >
+                    {emailVerified ? "✓" : "OK"}
+                  </button>
                 </div>
               </label>
             </div>
 
-            <div style={{ display: currentStep === 1 ? "flex" : "none", gap: "10px", marginTop: "10px", flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: "10px", marginTop: "14px", flexWrap: "wrap", alignItems: "center" }}>
               <button
                 type="button"
                 onClick={openBiometricsModal}
@@ -293,36 +311,80 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
                 {passkeyVerified ? "✓ Face ID / Huella Verificada" : "📷 Abrir Face ID / Huella"}
               </button>
 
-              <span style={{ fontSize: "0.72rem", color: smsVerified ? "#6ee7b7" : "#8A94AD", background: smsVerified ? "rgba(16, 185, 129, 0.15)" : "rgba(138, 148, 173, 0.1)", padding: "4px 8px", borderRadius: "6px", border: smsVerified ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(138, 148, 173, 0.3)" }}>
-                {smsVerified ? "✓ SMS Verificado" : "⏳ SMS pendiente"}
-              </span>
-
-              <span style={{ fontSize: "0.72rem", color: tokenVerified ? "#6ee7b7" : "#8A94AD", background: tokenVerified ? "rgba(16, 185, 129, 0.15)" : "rgba(138, 148, 173, 0.1)", padding: "4px 8px", borderRadius: "6px", border: tokenVerified ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(138, 148, 173, 0.3)" }}>
-                {tokenVerified ? "✓ Token DLP activo" : "⏳ Token DLP pendiente"}
+              <span style={{ fontSize: "0.72rem", color: emailVerified ? "#6ee7b7" : "#8A94AD", background: emailVerified ? "rgba(16, 185, 129, 0.15)" : "rgba(138, 148, 173, 0.1)", padding: "4px 8px", borderRadius: "6px", border: emailVerified ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(138, 148, 173, 0.2)" }}>
+                {emailVerified ? "✓ Correo OTP Verificado" : "⏳ Correo OTP Pendiente"}
               </span>
             </div>
           </div>
 
+          {/* PASO 2: LÍMITES Y BÚSQUEDA */}
+          <div className="wizard-step" style={{ display: currentStep === 2 ? "grid" : "none" }}>
+            <h3>2. Define los límites</h3>
+            <label>¿Quién autoriza?<input value={humanName} onChange={(event) => setHumanName(event.target.value)} placeholder="Tu nombre" required /></label>
+            <label>¿Cuánto puede gastar como máximo en cada compra?<div className="money-field"><span>USD $</span><input value={maxAmount} onChange={(event) => setMaxAmount(event.target.value)} inputMode="decimal" placeholder="150" required /></div></label>
+            <div className="form-pair">
+              <label>¿En qué puede gastar?<select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+              <label>¿En qué comercios?<select value={merchant} onChange={(event) => setMerchant(event.target.value)}>{merchants.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+            </div>
+            <div className="form-pair">
+              <label>¿Cuántas compras puede hacer como máximo?<input value={maxUses} onChange={(event) => setMaxUses(event.target.value)} inputMode="numeric" placeholder="3" required /></label>
+              <label>¿Hasta cuándo es válido este permiso?<input type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></label>
+            </div>
+            <label>¿Alguna condición de precio?<div className="price-condition"><span>Solo si el precio baja de USD $</span><input value={priceBelow} onChange={(event) => setPriceBelow(event.target.value)} inputMode="decimal" placeholder="150" required /></div></label>
+
+            {category === "travel.flights" && (
+              <div style={{ marginTop: "12px", borderTop: "1px solid rgba(77, 124, 255, 0.2)", paddingTop: "10px" }}>
+                <p style={{ fontSize: "0.75rem", color: "#93c5fd", fontWeight: 700, margin: "0 0 6px" }}>Búsqueda de Vuelo</p>
+                <div className="form-pair">
+                  <label>Origen<input value={flightOrigin} onChange={(event) => setFlightOrigin(event.target.value)} placeholder="BUE o Buenos Aires" required /></label>
+                  <label>Destino<input value={flightDestination} onChange={(event) => setFlightDestination(event.target.value)} placeholder="COR o Ciudad de México" required /></label>
+                </div>
+                <label style={{ marginTop: "6px" }}>Fecha de salida<input type="date" value={departureDate} onChange={(event) => setDepartureDate(event.target.value)} min={new Date().toISOString().slice(0, 10)} required /></label>
+              </div>
+            )}
+          </div>
+
+          {/* PASO 3: MÉTODO DE PAGO SEGURO DLP */}
+          <div className="wizard-step wizard-security-step" style={{ display: currentStep === 3 ? "block" : "none", background: "rgba(30, 41, 59, 0.6)", padding: "14px", borderRadius: "10px", border: "1px solid rgba(77, 124, 255, 0.35)", marginTop: "4px" }}>
+            <h3>3. Método de pago seguro</h3>
+            <label style={{ fontSize: "0.72rem" }}>
+              💳 Método de Pago (Stripe Elements / Scoped Token):
+              <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
+                <input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="•••• •••• •••• 4242" style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
+                <button type="button" onClick={async () => { try { const token = await handleTokenizeCard(cardNumber); if (token) setTokenVerified(true); } catch (e) { console.warn(e); } }} style={{ background: tokenVerified ? "rgba(16, 185, 129, 0.45)" : "rgba(59, 130, 246, 0.2)", border: tokenVerified ? "1px solid #10b981" : "1px solid #3b82f6", color: tokenVerified ? "#6ee7b7" : "#93c5fd", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: "0 10px", whiteSpace: "nowrap" }}>{tokenVerified ? "✓ Tokenizado" : "🛡️ Tokenizar"}</button>
+              </div>
+            </label>
+            <div style={{ marginTop: "12px" }}>
+              <span style={{ fontSize: "0.72rem", color: tokenVerified ? "#6ee7b7" : "#8A94AD", background: tokenVerified ? "rgba(16, 185, 129, 0.15)" : "rgba(138, 148, 173, 0.1)", padding: "4px 8px", borderRadius: "6px", border: tokenVerified ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(138, 148, 173, 0.3)" }}>
+                {tokenVerified ? `✓ Token DLP activo: ${paymentMethodId || "vtok_scoped"}` : "⏳ Token DLP pendiente"}
+              </span>
+            </div>
+          </div>
+
+          {/* PASO 4: CONFIRMACIÓN */}
           <div className="wizard-step" style={{ display: currentStep === 4 ? "grid" : "none" }}>
-            <h3>Confirma y autoriza</h3>
+            <h3>4. Confirma y autoriza</h3>
             <div className="permission-summary"><span>ASÍ SE VERÁ TU PERMISO</span><p>{summary}</p></div>
           </div>
 
           {(error || securityError) && <div className="form-error" role="alert">{error || securityError}</div>}
 
-          {currentStep === 1 && !(passkeyVerified && smsVerified) && <p className="wizard-notice">Para continuar, completa {passkeyVerified ? "la verificación por SMS" : smsVerified ? "la verificación biométrica" : "la biometría y la verificación por SMS"}.</p>}
+          {currentStep === 1 && !(passkeyVerified && (emailVerified || smsVerified)) && (
+            <p className="wizard-notice">
+              Para continuar, completa {passkeyVerified ? "la verificación de tu correo por OTP" : (emailVerified || smsVerified) ? "la verificación biométrica" : "la biometría y la verificación de tu correo por OTP"}.
+            </p>
+          )}
           {currentStep === 3 && !tokenVerified && <p className="wizard-notice">Tokeniza tu método de pago seguro para continuar.</p>}
 
           <div className="wizard-navigation">
             {currentStep > 1 && <button className="wizard-back" type="button" onClick={() => setCurrentStep((currentStep - 1) as 1 | 2 | 3 | 4)}>← Atrás</button>}
-            {currentStep === 1 && <button className="wizard-next" type="button" disabled={!(passkeyVerified && smsVerified)} onClick={() => setCurrentStep(2)}>Siguiente →</button>}
+            {currentStep === 1 && <button className="wizard-next" type="button" disabled={!(passkeyVerified && (emailVerified || smsVerified))} onClick={() => setCurrentStep(2)}>Siguiente →</button>}
             {currentStep === 2 && <button className="wizard-next" type="button" onClick={() => setCurrentStep(3)}>Siguiente →</button>}
             {currentStep === 3 && <button className="wizard-next" type="button" disabled={!tokenVerified} onClick={() => setCurrentStep(4)}>Siguiente →</button>}
-            {currentStep === 4 && <button className="authorize-button" disabled={creating || !(passkeyVerified && smsVerified && tokenVerified)} type="submit">{creating ? "CREANDO TU PERMISO…" : !passkeyVerified ? "⚠ FALTA BIOMETRÍA" : !smsVerified ? "⚠ FALTA SMS OTP" : !tokenVerified ? "⚠ FALTA TOKEN BANCARIO" : "AUTORIZAR A SATURDAY"}</button>}
+            {currentStep === 4 && <button className="authorize-button" disabled={creating || !(passkeyVerified && (emailVerified || smsVerified) && (tokenVerified || isStripeTokenized))} type="submit">{creating ? "CREANDO TU PERMISO…" : !passkeyVerified ? "⚠ FALTA BIOMETRÍA" : !(emailVerified || smsVerified) ? "⚠ FALTA CORREO OTP" : !tokenVerified ? "⚠ FALTA TOKEN BANCARIO" : "AUTORIZAR A SATURDAY"}</button>}
           </div>
         </form>
       </section>
     </main>
   );
-}
 }

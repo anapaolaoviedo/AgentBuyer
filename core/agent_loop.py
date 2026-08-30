@@ -260,6 +260,8 @@ def run_agent(mandate_id: str, search_fields: dict | None = None) -> dict:
                     "pnr": f"PNR-VYA-{attempt_id[-6:].upper()}",
                     "precio_total": selected_flight.get("price", 130),
                     "moneda": "USD",
+                    "pasajero": mandate.get("human", {}).get("display_name", "Marta"),
+                    "candidate_id": mandate_id,
                 }
             )
         except Exception as notify_err:
