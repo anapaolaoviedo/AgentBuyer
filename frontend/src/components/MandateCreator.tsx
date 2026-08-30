@@ -297,8 +297,10 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
       authentication: {
         passkey_biometrics: passkeyVerified ? "verified_webauthn_touch_id" : "unverified",
         sms_otp_confirmed: smsVerified,
+        email_otp_confirmed: otpChannel === "email" && smsVerified,
         sms_code: smsOtp,
         otp_channel: otpChannel,
+        verified_email: userEmail.trim(),
       },
       payment_token: {
         token_id: paymentMethodId || `vtok_${Math.random().toString(36).slice(2, 10)}`,
