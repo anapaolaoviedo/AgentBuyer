@@ -448,17 +448,8 @@ def api_get_catalog():
     return vuelaya_merchant.get_catalog()
 
 
-@app.get("/merchant/flights")
-def api_get_flights():
-    return get_flights()
-
-
-@app.post("/agent/run")
-def api_run_agent(payload: dict):
-    mandate_id = payload.get("mandate_id")
-    if not mandate_id:
-        raise HTTPException(status_code=422, detail="mandate_id is required")
-    return run_agent(mandate_id)
+# /merchant/flights, /merchant/search y /agent/run viven en sus routers
+# (api/merchant.py, api/agent.py) — una sola dueña por ruta, sin sombras.
 
 
 @app.post("/purchases/execute")

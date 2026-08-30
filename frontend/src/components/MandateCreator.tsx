@@ -227,7 +227,10 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
             <div className="form-pair" style={{ marginTop: "8px" }}>
               <label style={{ fontSize: "0.72rem" }}>
                 💳 Método de Pago (Stripe Elements / Scoped Token):
-                <input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="•••• •••• •••• 4242" style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="•••• •••• •••• 4242" style={{ minHeight: "2.3rem", fontSize: "0.82rem" }} />
+                  <button type="button" onClick={async () => { try { const token = await handleTokenizeCard(); if (token) setTokenVerified(true); } catch (e) { console.warn(e); } }} style={{ background: tokenVerified ? "rgba(16, 185, 129, 0.45)" : "rgba(59, 130, 246, 0.2)", border: tokenVerified ? "1px solid #10b981" : "1px solid #3b82f6", color: tokenVerified ? "#6ee7b7" : "#93c5fd", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: "0 10px", whiteSpace: "nowrap" }}>{tokenVerified ? "✓" : "🛡️ Tokenizar"}</button>
+                </div>
               </label>
               <label style={{ fontSize: "0.72rem" }}>
                 Código SMS (OTP):
@@ -258,12 +261,12 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
                 {passkeyVerified ? "✓ Face ID / Huella Verificada" : "📷 Abrir Face ID / Huella"}
               </button>
 
-              <span style={{ fontSize: "0.72rem", color: "#6ee7b7", background: "rgba(16, 185, 129, 0.15)", padding: "4px 8px", borderRadius: "6px", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
-                ✓ SMS Verificado
+              <span style={{ fontSize: "0.72rem", color: smsVerified ? "#6ee7b7" : "#8A94AD", background: smsVerified ? "rgba(16, 185, 129, 0.15)" : "rgba(138, 148, 173, 0.1)", padding: "4px 8px", borderRadius: "6px", border: smsVerified ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(138, 148, 173, 0.3)" }}>
+                {smsVerified ? "✓ SMS Verificado" : "⏳ SMS pendiente"}
               </span>
 
-              <span style={{ fontSize: "0.72rem", color: "#93c5fd", background: "rgba(59, 130, 246, 0.15)", padding: "4px 8px", borderRadius: "6px", border: "1px solid rgba(59, 130, 246, 0.3)" }}>
-                🛡️ Token DLP: <code>vtok_...</code>
+              <span style={{ fontSize: "0.72rem", color: tokenVerified ? "#6ee7b7" : "#8A94AD", background: tokenVerified ? "rgba(16, 185, 129, 0.15)" : "rgba(138, 148, 173, 0.1)", padding: "4px 8px", borderRadius: "6px", border: tokenVerified ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(138, 148, 173, 0.3)" }}>
+                {tokenVerified ? "✓ Token DLP activo" : "⏳ Token DLP pendiente"}
               </span>
             </div>
           </div>
