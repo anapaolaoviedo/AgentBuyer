@@ -386,3 +386,139 @@ END:VCALENDAR"""
 
     print(f"[Local Mode] Receipt generated for {dest} (PNR: {pnr})")
     return {"status": 200, "message": "Receipt generated in local mode.", "sent_to": dest}
+
+
+def enviar_token_otp(correo_destino: str, codigo_otp: str) -> dict:
+    """
+    Sends the 6-digit Zero-Trust security token (OTP) from saturday.agentbuyer@gmail.com
+    to ANY destination email address.
+    """
+    dest = (correo_destino or "").strip().lower()
+    if not dest or "@" not in dest:
+        return {"status": 400, "message": "Invalid email address."}
+
+    smtp_user = os.environ.get("SMTP_USER", "")
+    smtp_pass = os.environ.get("SMTP_PASS", "")
+
+    msg = MIMEText(
+        f"🛡️ Zero-Trust Verification Code (Aegis):\n\n"
+        f"Your 6-digit security token is: {codigo_otp}\n\n"
+        f"This token expires in 10 minutes. Use it to authenticate your mandate with Saturday Agent.\n"
+        f"Security Seal: Ed25519 & Zero-Trust MFA.",
+        "plain",
+        "utf-8"
+    )
+    msg["Subject"] = f"Aegis Security OTP: {codigo_otp}"
+    msg["From"] = f"Saturday Agent <{smtp_user}>" if smtp_user else "Saturday Agent <saturday.agentbuyer@gmail.com>"
+    msg["To"] = dest
+
+    if smtp_user and smtp_pass:
+        try:
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(smtp_user, [dest], msg.as_string())
+            print(f"[Gmail SMTP OTP] Successfully sent OTP {codigo_otp} to {dest}")
+            return {"status": 200, "message": f"OTP token sent to {dest}", "sent_via": "smtp"}
+        except Exception as err:
+            print(f"[Gmail SMTP ERROR] Failed to send OTP to {dest}: {err}")
+            return {"status": 500, "message": str(err), "sent_via": "error"}
+
+    return {"status": 200, "message": f"OTP generated in local mode for {dest}", "sent_via": "memory"}
+
+
+def leer_correos_recibidos(limite: int = 10) -> dict:
+    """
+    Reads the latest incoming emails received at saturday.agentbuyer@gmail.com via IMAP SSL.
+    Returns a list of parsed messages with sender, subject, date, and body preview.
+    """
+    import imaplib
+    import email
+    from email.header import decode_header
+
+    smtp_user = os.environ.get("SMTP_USER", "")
+    smtp_pass = os.environ.get("SMTP_PASS", "")
+
+    if not (smtp_user and smtp_pass):
+        return {
+            "status": 200,
+            "connected": False,
+            "total_messages": 0,
+            "messages": [],
+            "message": "SMTP/IMAP credentials not configured in environment."
+        }
+
+    try:
+        mail = imaplib.IMAP4_SSL("imap.gmail.com", 993)
+        mail.login(smtp_user, smtp_pass)
+        mail.select("inbox")
+
+        status, response = mail.search(None, "ALL")
+        if status != "OK":
+            mail.logout()
+            return {"status": 500, "message": "Failed to search inbox."}
+
+        email_ids = response[0].split()
+        total_inbox = len(email_ids)
+        recent_ids = email_ids[-limite:] if total_inbox >= limite else email_ids
+        recent_ids.reverse()
+
+        mensajes_recibidos = []
+        for e_id in recent_ids:
+            res, data = mail.fetch(e_id, "(RFC822)")
+            if res != "OK":
+                continue
+
+            raw_email = data[0][1]
+            msg = email.message_from_bytes(raw_email)
+
+            subject_raw, encoding = decode_header(msg.get("Subject", ""))[0]
+            if isinstance(subject_raw, bytes):
+                subject = subject_raw.decode(encoding if encoding else "utf-8", errors="ignore")
+            else:
+                subject = str(subject_raw)
+
+            from_addr = msg.get("From", "")
+            date_str = msg.get("Date", "")
+
+            body = ""
+            if msg.is_multipart():
+                for part in msg.walk():
+                    content_type = part.get_content_type()
+                    content_disposition = str(part.get("Content-Disposition"))
+                    if content_type == "text/plain" and "attachment" not in content_disposition:
+                        payload = part.get_payload(decode=True)
+                        if payload:
+                            body = payload.decode("utf-8", errors="ignore")
+                            break
+            else:
+                payload = msg.get_payload(decode=True)
+                if payload:
+                    body = payload.decode("utf-8", errors="ignore")
+
+            mensajes_recibidos.append({
+                "id": e_id.decode("utf-8") if isinstance(e_id, bytes) else str(e_id),
+                "from": from_addr,
+                "subject": subject,
+                "date": date_str,
+                "snippet": body[:200].strip() if body else "",
+            })
+
+        mail.close()
+        mail.logout()
+
+        return {
+            "status": 200,
+            "connected": True,
+            "account": smtp_user,
+            "total_inbox": total_inbox,
+            "returned_count": len(mensajes_recibidos),
+            "messages": mensajes_recibidos
+        }
+    except Exception as e:
+        print(f"[IMAP Receive ERROR] Failed reading inbox for {smtp_user}: {e}")
+        return {
+            "status": 500,
+            "connected": False,
+            "error": str(e),
+            "messages": []
+        }

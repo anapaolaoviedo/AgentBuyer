@@ -331,6 +331,45 @@ def auth_email_check(payload: EmailCheckRequest):
     raise HTTPException(status_code=401, detail="Incorrect or expired Email OTP code.")
 
 
+class TicketSendRequest(BaseModel):
+    email: str
+    pnr: Optional[str] = None
+    passenger: Optional[str] = None
+    destination: Optional[str] = None
+    merchant: Optional[str] = None
+    price: Optional[float] = None
+    currency: Optional[str] = "USD"
+
+
+@app.get("/inbox/messages")
+def api_get_inbox_messages(limit: int = Query(default=10, ge=1, le=50)):
+    """
+    Connects to saturday.agentbuyer@gmail.com via IMAP and reads the latest received emails.
+    """
+    from core.notifications import leer_correos_recibidos
+    result = leer_correos_recibidos(limite=limit)
+    return result
+
+
+@app.post("/notifications/send-ticket")
+def api_send_ticket_notification(payload: TicketSendRequest):
+    """
+    Dispatches an official receipt/ticket with Google Calendar integration to ANY destination email.
+    """
+    from core.notifications import enviar_ticket_confirmacion
+    reserva = {
+        "pnr": payload.pnr or "PNR-VYA-849201",
+        "pasajero": payload.passenger or "Authorized Customer",
+        "destino": payload.destination or "Direct Flight Buenos Aires (AEP) -> Córdoba (COR)",
+        "proveedor": payload.merchant or "VuelaYa Travel & Logistics Inc.",
+        "precio_total": payload.price or 130.00,
+        "moneda": payload.currency or "USD",
+        "orden_id": f"ORD-{int(time.time()) % 100000}",
+    }
+    result = enviar_ticket_confirmacion(payload.email, reserva)
+    return result
+
+
 # Mandate Endpoints
 @app.post("/mandates/create", response_model=Mandate)
 def api_create_mandate(req: CreateMandateRequest):
