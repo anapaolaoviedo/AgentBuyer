@@ -1,4 +1,5 @@
 import { FormEvent, useMemo, useState, useEffect, useRef } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import Saturday, { type SaturdayExpression } from "./Saturday";
 import { useLivenessVerification } from "../hooks/useLivenessVerification";
 import { useZeroTrustSecurity } from "../hooks/useZeroTrustSecurity";
@@ -7,6 +8,8 @@ const API_BASE = "http://127.0.0.1:8000";
 
 type MandateCreatorProps = {
   onCreated: (mandateId: string) => void;
+  /** Continúa el relato automático en Mission Control después de emitir el mandato. */
+  onDemoCreated?: (mandateId: string) => void;
 };
 
 type VerificationStatus = "pending" | "processing" | "complete";
@@ -144,7 +147,55 @@ function CalendarDatePicker({ value, onChange, ariaLabel = "Pick a date" }: Cale
   );
 }
 
-export default function MandateCreator({ onCreated }: MandateCreatorProps) {
+type WizardDemoStage = "idle" | "preparing" | "biometrics" | "payment" | "limits" | "authorizing" | "paused" | "error";
+
+const DEMO_MARTA = {
+  name: "Marta",
+  document: "PASSPORT-AR-948291",
+  phone: "+52 56 1447 3083",
+  email: "marta@example.com",
+  card: "4242 4242 4242 4242",
+  amount: "150",
+  uses: "3",
+  price: "150",
+  origin: "BUE",
+  destination: "COR",
+};
+
+const WIZARD_DEMO_LABELS: Record<Exclude<WizardDemoStage, "idle" | "paused" | "error">, string> = {
+  preparing: "Marta verifies her identity",
+  biometrics: "Verifying identity…",
+  payment: "Protecting the payment method…",
+  limits: "Setting verifiable limits…",
+  authorizing: "Issuing the mandate…",
+};
+
+function withTimeout<T>(promise: Promise<T>, milliseconds = 8000): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("The verification took too long. You can continue manually.")), milliseconds);
+    promise.then((value) => { window.clearTimeout(timer); resolve(value); }, (reason) => { window.clearTimeout(timer); reject(reason); });
+  });
+}
+
+/** Espera disponibilidad de un frame real; no es una pausa fija antes de verificar. */
+function waitForCameraFrame(getVideo: () => HTMLVideoElement | null, timeoutMs = 30000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const deadline = Date.now() + timeoutMs;
+    const check = () => {
+      const video = getVideo();
+      if (video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0) {
+        resolve();
+      } else if (Date.now() >= deadline) {
+        reject(new Error("The camera did not provide an image within 30 seconds."));
+      } else {
+        window.setTimeout(check, 120);
+      }
+    };
+    check();
+  });
+}
+
+export default function MandateCreator({ onCreated, onDemoCreated }: MandateCreatorProps) {
   // Prellenado con el perfil demo de Marta: el wizard completo se recorre
   // solo con clics (sin teclear nada) para una demo rápida y confiable.
   const [humanName, setHumanName] = useState("Marta");
@@ -179,12 +230,17 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
   const [editingBiometric, setEditingBiometric] = useState(false);
   const [microExpression, setMicroExpression] = useState<SaturdayExpression | null>(null);
   const expressionTimer = useRef<number | null>(null);
+  const demoPauseResolver = useRef<(() => void) | null>(null);
+  const demoPauseTimer = useRef<number | null>(null);
 
   const { videoRef, livenessState, startCamera, stopCamera, verifyFacePresence } = useLivenessVerification();
   const { handlePasskeyChallenge, handleTokenizeCard, paymentMethodId, errorMessage: securityError } = useZeroTrustSecurity();
 
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [wizardDemoStage, setWizardDemoStage] = useState<WizardDemoStage>("idle");
+  const [wizardDemoMessage, setWizardDemoMessage] = useState("");
+  const [showWizardDemoLabel, setShowWizardDemoLabel] = useState(false);
 
   const selectedCategory = categories.find((item) => item.value === category)?.label ?? category;
   const selectedMerchant = merchants.find((item) => item.value === merchant)?.label ?? merchant;
@@ -241,47 +297,61 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
     }
   }
 
-  async function createMandate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submitMandate(demo = false): Promise<boolean> {
     setError(null);
-    const amount = Number(maxAmount);
-    const uses = Number(maxUses);
-    const price = Number(priceBelow);
+    // La demo puede arrancar con el wizard vacío: el payload se construye con
+    // los mismos valores que se muestran, sin depender de un re-render previo.
+    const demoValues = demo ? {
+      name: humanName || DEMO_MARTA.name,
+      document: userIdDoc || DEMO_MARTA.document,
+      phone: userPhone || DEMO_MARTA.phone,
+      email: userEmail || DEMO_MARTA.email,
+      card: cardNumber || DEMO_MARTA.card,
+      amount: maxAmount || DEMO_MARTA.amount,
+      uses: maxUses || DEMO_MARTA.uses,
+      price: priceBelow || DEMO_MARTA.price,
+      origin: flightOrigin || DEMO_MARTA.origin,
+      destination: flightDestination || DEMO_MARTA.destination,
+      date: departureDate || nearTermDate(),
+    } : { name: humanName, document: userIdDoc, phone: userPhone, email: userEmail, card: cardNumber, amount: maxAmount, uses: maxUses, price: priceBelow, origin: flightOrigin, destination: flightDestination, date: departureDate };
+    const amount = Number(demoValues.amount);
+    const uses = Number(demoValues.uses);
+    const price = Number(demoValues.price);
     // Si falta algo del paso 3, regresamos ahí para que el error sea accionable.
-    if (!humanName.trim() || !Number.isFinite(amount) || amount <= 0 || !Number.isInteger(uses) || uses <= 0 || !Number.isFinite(price) || price <= 0) {
+    if (!demoValues.name.trim() || !Number.isFinite(amount) || amount <= 0 || !Number.isInteger(uses) || uses <= 0 || !Number.isFinite(price) || price <= 0) {
       setError("Fill in your name and the limits with valid numbers greater than zero.");
       setCurrentStep(3);
-      return;
+      return false;
     }
 
-    if (category === "travel.flights" && (!flightOrigin.trim() || !flightDestination.trim() || !departureDate)) {
+    if (category === "travel.flights" && (!demoValues.origin.trim() || !demoValues.destination.trim() || !demoValues.date)) {
       setError("Fill in origin, destination, and departure date to search for flights.");
       setCurrentStep(3);
-      return;
+      return false;
     }
     if (!category || !merchant) {
       setError("Choose a category and a merchant for the permission.");
       setCurrentStep(3);
-      return;
+      return false;
     }
 
-    const mandateId = safeId(humanName, "mnd");
+    const mandateId = safeId(demoValues.name, "mnd");
     const payload = {
       mandate_id: mandateId,
       human: {
-        id: safeId(humanName, "hum"),
-        display_name: humanName.trim(),
-        id_document: userIdDoc,
-        phone: userPhone,
+        id: safeId(demoValues.name, "hum"),
+        display_name: demoValues.name.trim(),
+        id_document: demoValues.document,
+        phone: demoValues.phone,
         // El recibo de compra se envía a mandate.human.email (core/notifications).
-        ...(userEmail.trim() ? { email: userEmail.trim() } : {}),
+        ...(demoValues.email.trim() ? { email: demoValues.email.trim() } : {}),
       },
       agent: { id: "agt_saturday", display_name: "Saturday" },
       ...(category === "travel.flights" ? {
         search_fields: {
-          origin: flightOrigin.trim(),
-          destination: flightDestination.trim(),
-          departure_date: departureDate,
+          origin: demoValues.origin.trim(),
+          destination: demoValues.destination.trim(),
+          departure_date: demoValues.date,
         },
       } : {}),
       constraints: {
@@ -297,12 +367,12 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
       },
       authentication: {
         passkey_biometrics: passkeyVerified ? "verified_webauthn_touch_id" : "unverified",
-        receipt_email: userEmail.trim(),
+        receipt_email: demoValues.email.trim(),
       },
       payment_token: {
         token_id: paymentMethodId || `vtok_${Math.random().toString(36).slice(2, 10)}`,
         token_type: "SCOPED_VIRTUAL_TOKEN",
-        masked_card: cardNumber ? (cardNumber.startsWith("••••") ? cardNumber : `•••• ${cardNumber.replace(/\D/g, "").slice(-4) || "4242"}`) : "•••• 4242",
+        masked_card: demoValues.card ? (demoValues.card.startsWith("••••") ? demoValues.card : `•••• ${demoValues.card.replace(/\D/g, "").slice(-4) || "4242"}`) : "•••• 4242",
         bank_issuer: "Stripe Elements / Galicia AI Payments",
       },
       ...(validUntil ? { valid_until: validUntil } : {}),
@@ -317,17 +387,167 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error(`El sistema respondió ${response.status}.`);
-      onCreated(mandateId);
+      if (demo) onDemoCreated?.(mandateId);
+      else onCreated(mandateId);
+      return true;
     } catch (caught) {
       setError(caught instanceof Error ? `We couldn't create your permission: ${caught.message}` : "We couldn't create your permission. Check the connection to the system.");
+      return false;
     } finally {
       setCreating(false);
     }
   }
 
+  async function createMandate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await submitMandate();
+  }
+
+  function loadMartaDemoValues() {
+    setHumanName((value) => value || DEMO_MARTA.name);
+    setUserIdDoc((value) => value || DEMO_MARTA.document);
+    setUserPhone((value) => value || DEMO_MARTA.phone);
+    setUserEmail((value) => value || DEMO_MARTA.email);
+    setCardNumber((value) => value || DEMO_MARTA.card);
+    setMaxAmount((value) => value || DEMO_MARTA.amount);
+    setMaxUses((value) => value || DEMO_MARTA.uses);
+    setPriceBelow((value) => value || DEMO_MARTA.price);
+    setCategory("travel.flights");
+    setMerchant("mch_vuelaya");
+    setFlightOrigin((value) => value || DEMO_MARTA.origin);
+    setFlightDestination((value) => value || DEMO_MARTA.destination);
+    setDepartureDate((value) => value || nearTermDate());
+  }
+
+  function clearWizardDemoPause() {
+    if (demoPauseTimer.current !== null) window.clearTimeout(demoPauseTimer.current);
+    demoPauseTimer.current = null;
+    demoPauseResolver.current = null;
+  }
+
+  function waitForNarration(message: string): Promise<void> {
+    setWizardDemoStage("paused");
+    setWizardDemoMessage(message);
+    return new Promise((resolve) => {
+      const done = () => {
+        clearWizardDemoPause();
+        resolve();
+      };
+      demoPauseResolver.current = done;
+      // El control es manual; este respaldo largo evita dejar una demo abandonada.
+      demoPauseTimer.current = window.setTimeout(done, 15000);
+    });
+  }
+
+  function advanceWizardDemo() {
+    demoPauseResolver.current?.();
+  }
+
+  async function verifyDemoPresence() {
+    const deadline = Date.now() + 30000;
+    let lastError: unknown;
+    while (Date.now() < deadline) {
+      try {
+        await waitForCameraFrame(() => videoRef.current, Math.max(1, deadline - Date.now()));
+        return await verifyFacePresence();
+      } catch (caught) {
+        lastError = caught;
+        // La cámara permanece abierta: se vuelve a evaluar el siguiente frame,
+        // dando tiempo a la persona de colocarse frente a ella.
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 750));
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error("Human presence could not be verified within 30 seconds.");
+  }
+
+  async function runWizardDemo() {
+    if (wizardDemoStage !== "idle" && wizardDemoStage !== "error") return;
+    setError(null);
+    setWizardDemoStage("preparing");
+    setWizardDemoMessage("ACT 1 · ISSUANCE: opening a clean audit session.");
+
+    try {
+      const auditReset = await withTimeout(fetch(`${API_BASE}/audit/reset`, { method: "POST" }));
+      if (!auditReset.ok) throw new Error("The audit session could not be reset.");
+      setWizardDemoMessage("ACT 1 · ISSUANCE: loading Marta's demonstration mandate.");
+      loadMartaDemoValues();
+      setCurrentStep(1);
+      await waitForNarration("First, we confirm that Marta is the person authorizing Saturday.");
+
+      setWizardDemoStage("biometrics");
+      setWizardDemoMessage("Verifying biometrics with the real provider…");
+      setShowBioModal(true);
+      setBioMode("camera");
+      await withTimeout(startCamera(), 30000);
+      await verifyDemoPresence();
+      setPasskeyVerified(true);
+      setEditingBiometric(false);
+      setShowBioModal(false);
+      showMicroExpression("happy");
+      await waitForNarration("Biometrics confirmed. Saturday never sees the card number: we tokenize it now.");
+
+      setCurrentStep(2);
+      setWizardDemoStage("payment");
+      setWizardDemoMessage("Tokenizing the payment method…");
+      const token = await withTimeout(handleTokenizeCard(cardNumber || DEMO_MARTA.card));
+      if (!token) throw new Error("No se pudo tokenizar el método de pago.");
+      setTokenVerified(true);
+      await waitForNarration("Payment method protected. Now we review the limits Marta chose.");
+
+      setCurrentStep(3);
+      setWizardDemoStage("limits");
+      setWizardDemoMessage("Marta authorizes VuelaYa flights up to USD 150, at most three times.");
+      await waitForNarration("The limits are clear, verifiable, and under Marta's control.");
+
+      setCurrentStep(4);
+      setWizardDemoStage("authorizing");
+      setWizardDemoMessage("Signing and issuing the real mandate…");
+      const created = await withTimeout(submitMandate(true));
+      if (!created) throw new Error("The demonstration mandate could not be created.");
+    } catch (caught) {
+      stopCamera();
+      setShowBioModal(false);
+      setWizardDemoStage("error");
+      setWizardDemoMessage(caught instanceof Error ? caught.message : "The demo could not complete a real verification.");
+    }
+  }
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (wizardDemoStage === "paused" && (event.key === " " || event.key === "ArrowRight")) {
+        event.preventDefault();
+        advanceWizardDemo();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [wizardDemoStage]);
+
+  useEffect(() => {
+    if (wizardDemoStage === "idle" || wizardDemoStage === "error") {
+      setShowWizardDemoLabel(false);
+      return;
+    }
+    setShowWizardDemoLabel(true);
+    const timer = window.setTimeout(() => setShowWizardDemoLabel(false), 4500);
+    return () => window.clearTimeout(timer);
+  }, [wizardDemoStage]);
+
+  useEffect(() => () => clearWizardDemoPause(), []);
+
   return (
     <main className="authorization-shell">
       <div className="starfield" aria-hidden="true" />
+      <button className="wizard-demo-launch" type="button" onClick={() => wizardDemoStage === "paused" ? advanceWizardDemo() : void runWizardDemo()} disabled={wizardDemoStage !== "idle" && wizardDemoStage !== "error" && wizardDemoStage !== "paused"}>
+        {wizardDemoStage === "paused" ? "Continue demo →" : "▶ Start demo"}
+      </button>
+      <AnimatePresence>
+        {showWizardDemoLabel && wizardDemoStage !== "idle" && wizardDemoStage !== "error" && (
+          <motion.aside className="wizard-demo-action-label" key={wizardDemoStage} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.22 }} aria-live="polite">
+            <span>GUIDED DEMO · ACT 1</span><strong>{wizardDemoStage === "paused" ? "Presenter pause — press Space or → to continue." : WIZARD_DEMO_LABELS[wizardDemoStage]}</strong>
+          </motion.aside>
+        )}
+      </AnimatePresence>
 
       {/* Modal Biométrico */}
       {showBioModal && (
@@ -398,7 +618,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
             <h3>{currentStep === 1 ? "Verify it's you" : "Secure payment method"}</h3>
 
             {currentStep === 1 && <>
-              <p className="verify-subtitle">Two quick verifications, in order: your identity and your biometrics.</p>
+              <p className="verify-subtitle">Two quick verifications: identity details and your biometrics.</p>
               <div className="verify-progress" role="status">
                 <span>{completedVerificationCount} of 2 verifications completed</span>
                 <div className="verify-progress-bar" aria-hidden="true"><i style={{ width: `${Math.round((completedVerificationCount / 2) * 100)}%` }} /></div>
@@ -478,7 +698,7 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
 
           {(error || securityError) && <div className="form-error" role="alert">{error || securityError}</div>}
 
-          {currentStep === 1 && !stepOneReady && <p className="wizard-notice">To continue, complete {identityComplete ? "the biometric verification" : passkeyVerified ? "your identity details" : "your identity details and the biometric verification"}.</p>}
+          {currentStep === 1 && !stepOneReady && <p className="wizard-notice">To continue, complete your identity details and biometric verification.</p>}
           {currentStep === 2 && !tokenVerified && <p className="wizard-notice">Tokenize your secure payment method to continue.</p>}
 
           <div className="wizard-navigation">
