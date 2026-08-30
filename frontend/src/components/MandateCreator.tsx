@@ -325,4 +325,3 @@ export default function MandateCreator({ onCreated }: MandateCreatorProps) {
     </main>
   );
 }
-}
