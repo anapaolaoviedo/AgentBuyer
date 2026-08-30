@@ -64,7 +64,7 @@ def verify_purchase(attempt_purchase: dict[str, Any]):
     """
     if "purchase" in attempt_purchase and not isinstance(attempt_purchase["purchase"], dict):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="purchase debe ser un objeto.",
         )
 
@@ -165,7 +165,7 @@ def verify_purchase(attempt_purchase: dict[str, Any]):
     engine_attempt = attempt_purchase.get("purchase", attempt_purchase)
     if not isinstance(engine_attempt, dict):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="purchase debe ser un objeto.",
         )
     engine_result = evaluate(mandate, live_state, engine_attempt)
@@ -210,7 +210,7 @@ def verify_purchase(attempt_purchase: dict[str, Any]):
     if verdict == "APPROVE":
         if amount is None:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="purchase.amount debe ser un número.",
             )
         apply_approved_purchase(mandate_id, amount)

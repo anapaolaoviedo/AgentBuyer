@@ -240,6 +240,7 @@ button { font: inherit; }
 .sms-code-controls { display: flex; flex-wrap: wrap; gap: .5rem; align-items: stretch; }
 .sms-code-controls input { flex: 1 1 9rem; min-width: 8rem; min-height: 2.4rem; font-size: .82rem; }
 .verify-hint { margin: 0; color: #8A94AD; font-size: .66rem; line-height: 1.4; }
+.field-hint { display: block; margin-top: .3rem; color: #8A94AD; font-size: .64rem; line-height: 1.4; font-weight: 400; }
 .verify-hint-warn { color: #FFB84D; }
 .verify-hint-tip { color: #3DDC97; }
 .verify-tabs { display: flex; gap: .35rem; padding: .25rem; border-radius: .6rem; border: 1px solid #232D45; background: rgba(10, 14, 26, .5); width: fit-content; }

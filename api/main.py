@@ -3,6 +3,7 @@ load_dotenv()
 
 import os
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
@@ -38,10 +39,31 @@ from audit.log import audit_ledger, append_entry, get_trail_for
 from core.dispute import dispute_arbiter
 from mandate.adversarial_tests import run_adversarial_suite
 
+def load_seed_mandates():
+    seed_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "shared", "seed_mandates.json")
+    if os.path.exists(seed_path):
+        import json
+        with open(seed_path, "r", encoding="utf-8") as f:
+            seeds = json.load(f)
+            for m in seeds:
+                try:
+                    store_create_mandate(m)
+                except Exception:
+                    pass
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Reemplaza el @app.on_event("startup") deprecado.
+    load_seed_mandates()
+    yield
+
+
 app = FastAPI(
     title="AgentBuyer Protocol API",
     description="Safe agentic purchases powered by Zero-Trust mandates, cryptographic signatures & deterministic limits.",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -54,20 +76,6 @@ app.add_middleware(
 
 # Key storage for demo
 _key_registry: Dict[str, Dict[str, str]] = {}
-
-
-@app.on_event("startup")
-def load_seed_mandates():
-    seed_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "shared", "seed_mandates.json")
-    if os.path.exists(seed_path):
-        import json
-        with open(seed_path, "r", encoding="utf-8") as f:
-            seeds = json.load(f)
-            for m in seeds:
-                try:
-                    store_create_mandate(m)
-                except Exception:
-                    pass
 
 
 def _get_or_create_keys(entity_id: str) -> Dict[str, str]:
@@ -280,6 +288,7 @@ def auth_email_start(payload: EmailStartRequest):
     code = str(secrets.randbelow(900000) + 100000)
     _email_otp_store[email_addr] = code
 
+    # Lectura dinámica: permite configurar credenciales sin editar código.
     smtp_user = os.getenv("SMTP_USER", "") or SMTP_USER
     smtp_pass = os.getenv("SMTP_PASS", "") or SMTP_PASS
 
@@ -302,7 +311,7 @@ def auth_email_start(payload: EmailStartRequest):
                 server.login(smtp_user, smtp_pass)
                 server.sendmail(smtp_user, [email_addr], msg.as_string())
             sent_via = "smtp"
-            print(f"[Gmail SMTP OTP] Successfully sent OTP code {code} to {email_addr}")
+            print(f"[Gmail SMTP OTP] Successfully sent OTP code to {email_addr}")
         except Exception as err:
             print(f"[Gmail SMTP ERROR] Failed to send OTP to {email_addr}: {err}")
 
@@ -407,7 +416,7 @@ def create_mandate_endpoint(mandate: dict[str, Any]):
     mandate_id = mandate.get("mandate_id")
     if not isinstance(mandate_id, str) or not mandate_id.strip():
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="El campo mandate_id es obligatorio y debe ser un texto no vacío.",
         )
 

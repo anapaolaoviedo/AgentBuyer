@@ -43,12 +43,12 @@ def approve_escalation(mandate_id: str, request: dict[str, Any]):
     decision = request.get("decision")
     if not isinstance(attempt_id, str) or not attempt_id.strip():
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="purchase_attempt_id es obligatorio y debe ser un texto no vacío.",
         )
     if decision not in ("approve", "decline"):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail='decision debe ser "approve" o "decline".',
         )
 

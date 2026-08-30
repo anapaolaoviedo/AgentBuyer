@@ -8,5 +8,3 @@ __pycache__/
 .venv/
 .pytest_cache/
 CLAUDE.md
-pytest.ini
-frontend/package-lock.json
