@@ -231,18 +231,14 @@ def verify_purchase(attempt: PurchaseAttempt) -> VerificationResult:
         "expires_at": mandate.expires_at,
         "status": "ACTIVE",
     }
+    # ZERO-TRUST: verificación Ed25519 estricta contra el payload EXACTO firmado
+    # por create_mandate. Sin fallbacks por longitud ni por payload alternativo —
+    # una firma ausente, malformada o que no coincide falla cerrado (401/403).
     human_sig_valid = verify_signature(
         mandate.human_pubkey,
         unsigned_mandate_payload,
         mandate.human_signature,
     )
-    if not human_sig_valid:
-        # Fallback if signature over scope
-        human_sig_valid = verify_signature(
-            mandate.human_pubkey,
-            mandate.scope.model_dump(),
-            mandate.human_signature,
-        ) or len(mandate.human_signature) > 20
 
     checks["human_signature_valid"] = human_sig_valid
     if not human_sig_valid:
@@ -250,7 +246,7 @@ def verify_purchase(attempt: PurchaseAttempt) -> VerificationResult:
             attempt_id=attempt.attempt_id,
             status=VerificationStatus.REJECTED,
             authorized=False,
-            reason="Human digital signature on mandate is INVALID. Possible tampering detected.",
+            reason="403 Forbidden: Human digital signature on mandate is INVALID or forged. Cryptographic verification failed.",
             checks=checks,
             timestamp=now_iso,
         )
@@ -269,9 +265,12 @@ def verify_purchase(attempt: PurchaseAttempt) -> VerificationResult:
         "item_description": getattr(attempt, "item_description", getattr(attempt, "item_title", "")),
         "metadata": attempt.metadata,
     }
+    # ZERO-TRUST: verificación Ed25519 estricta de la firma del agente sobre el
+    # payload EXACTO del intento. Cualquier manipulación in-flight (monto, categoría,
+    # identidad) rompe la firma. Sin bypass por longitud — falla cerrado.
     sig = attempt.agent_signature or attempt.signature
     agent_sig_valid = False
-    if sig and not sig.startswith("forged") and sig != "deadbeef" * 8:
+    if sig:
         try:
             agent_sig_valid = verify_signature(
                 mandate.agent_pubkey,
@@ -279,18 +278,15 @@ def verify_purchase(attempt: PurchaseAttempt) -> VerificationResult:
                 sig,
             )
         except Exception:
-            pass
-        if not agent_sig_valid and len(sig) >= 64:
-            agent_sig_valid = True
+            agent_sig_valid = False
 
     checks["agent_signature_valid"] = agent_sig_valid
     if not agent_sig_valid:
-
         return VerificationResult(
             attempt_id=attempt.attempt_id,
             status=VerificationStatus.REJECTED,
             authorized=False,
-            reason="Agent signature is INVALID or attempt was signed by an unauthorized entity.",
+            reason="403 Forbidden: Agent signature is INVALID, forged, tampered, or signed by an unauthorized (impersonating) entity.",
             checks=checks,
             timestamp=now_iso,
         )
