@@ -25,12 +25,18 @@ type Constraints = {
   conditions?: Condition[];
 };
 
+type SearchFields = {
+  origin?: string;
+  destination?: string;
+  departure_date?: string;
+};
+
 type MandateRecord = {
-  mandate: { mandate_id: string; human?: { name?: string }; constraints?: Constraints };
+  mandate: { mandate_id: string; human?: { name?: string }; constraints?: Constraints; search_fields?: SearchFields };
   live_state: LiveState;
 };
 
-type Flight = { id: string; route: string; price: number; category: string; merchant_id: string };
+type Flight = { id: string; route: string; price: number; category: string; merchant_id: string; source?: "web" | "mock" };
 type Check = { rule: string; pass: boolean; detail: string };
 type Verification = { verdict: "APPROVE" | "ESCALATE" | "REJECT"; checks: Check[]; human_readable?: string };
 type AgentRun = {
@@ -159,7 +165,10 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
       // Se inicia la operación real al comienzo; la UI solo demora su presentación.
       const agentRequest = request<AgentRun>("/agent/run", {
         method: "POST",
-        body: JSON.stringify({ mandate_id: mandateId }),
+        body: JSON.stringify({
+          mandate_id: mandateId,
+          ...(mandate?.mandate.search_fields ? { search_fields: mandate.mandate.search_fields } : {}),
+        }),
       });
       setPhase("discovering");
       for (let index = 0; index < flights.length; index += 1) {
@@ -178,6 +187,8 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
         checks: run.checks ?? [],
         human_readable: run.human_readable,
       };
+      // La respuesta normalizada del backend reemplaza el catálogo inicial.
+      if (run.flights_seen?.length) setFlights(run.flights_seen);
       setPhase("choosing");
       setChosenFlightId(run.selected_flight?.id ?? null);
       await wait(700);
@@ -266,7 +277,7 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
             <h1>Centro de confianza para agentes</h1>
           </div>
           <div className="mission-header-actions">
-            <button className="new-mandate-button" onClick={onCreateNew} disabled={busy !== null} type="button">+ CREAR NUEVO MANDATO</button>
+            <button className="new-mandate-button" onClick={() => { if (window.confirm("¿Salir y crear un nuevo permiso? Se limpiará la vista actual.")) onCreateNew(); }} disabled={busy !== null} type="button">+ EMPEZAR DE NUEVO</button>
             <button className="refresh-button" onClick={() => void resetMission()} disabled={busy !== null} type="button">
               {busy === "resetting" ? "REINICIANDO…" : "↻ REINICIAR VISTA"}
             </button>
@@ -312,7 +323,10 @@ function MissionControl({ mandateId, onCreateNew, onNavigate }: MissionControlPr
                     transition={{ duration: 0.2 }}
                   >
                     <div><p>{flight.route}</p><span>{displayName(flight.id)}</span>{isEvaluating && <em>{passesLimit ? "dentro del límite" : `excede ${amount(evaluationLimit, constraints.currency)}`}</em>}{isChosen && <em className="chosen-label">elegido por Saturday</em>}</div>
-                    <strong>{amount(flight.price)}</strong>
+                    <div className="flight-price">
+                      <strong>{amount(flight.price)}</strong>
+                      {flight.source && <small className="flight-source">{flight.source === "web" ? "búsqueda web" : "catálogo demo"}</small>}
+                    </div>
                   </motion.article>
                 );
               })}
