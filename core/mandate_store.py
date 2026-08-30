@@ -17,7 +17,8 @@ class MandateStore:
     """
 
     def __init__(self):
-        self._lock = threading.Lock()
+        # RLock: list_mandates() llama a get_mandate() con el lock ya tomado
+        self._lock = threading.RLock()
 
     def save_mandate(self, mandate: Union[Mandate, dict]) -> Mandate:
         with self._lock:
@@ -56,6 +57,11 @@ class MandateStore:
             if not record:
                 return None
             m_dict = record["mandate"]
+            # Los mandatos del flujo API guardan status en minúsculas ("active");
+            # el enum MandateStatus exige mayúsculas.
+            status_raw = m_dict.get("status")
+            if isinstance(status_raw, str):
+                m_dict = {**m_dict, "status": status_raw.upper()}
             m_obj = Mandate(**m_dict)
             
             # Chequeo en vivo de expiración
