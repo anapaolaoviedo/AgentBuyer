@@ -1,4 +1,4 @@
-﻿import os
+import os
 import smtplib
 from datetime import datetime, timezone
 from email.mime.text import MIMEText
@@ -306,11 +306,11 @@ def enviar_ticket_confirmacion(correo_destino: str, detalles_reserva: dict) -> d
             with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
                 server.login(current_smtp_user, current_smtp_pass)
                 server.send_message(msg)
-            print(f"📧 [Gmail SMTP] Recibo oficial enviado exitosamente a {dest}")
+            print(f"[Gmail SMTP] Recibo oficial enviado exitosamente a {dest}")
             return {"status": 200, "mensaje": "Recibo oficial enviado con éxito.", "enviado_a": dest}
         except Exception as e:
             print(f"Aviso SMTP al enviar recibo a {dest}: {e}")
             return {"status": 500, "mensaje": f"Error SMTP: {e}", "enviado_a": dest}
 
-    print(f"📧 [Modo Local] Recibo generado para {dest} (Order #{pnr})")
+    print(f"[Modo Local] Recibo generado para {dest} (Order #{pnr})")
     return {"status": 200, "mensaje": "Recibo generado en modo local.", "enviado_a": dest}
